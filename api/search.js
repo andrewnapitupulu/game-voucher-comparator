@@ -2,10 +2,13 @@
 
 const { searchPrices } = require('../src/services/search-service');
 
-function getQuery(req) {
-  if (req.query?.q !== undefined) return req.query.q;
-  const url = new URL(req.url, 'http://localhost');
-  return url.searchParams.get('q');
+function requestUrl(req) {
+  return new URL(req.url, 'http://localhost');
+}
+
+function getParam(req, name) {
+  if (req.query?.[name] !== undefined) return req.query[name];
+  return requestUrl(req).searchParams.get(name);
 }
 
 module.exports = async function handler(req, res) {
@@ -18,14 +21,22 @@ module.exports = async function handler(req, res) {
     return res.end(JSON.stringify({ ok: false, message: 'Method not allowed' }));
   }
 
-  const query = String(getQuery(req) || '').trim().slice(0, 120);
+  const query = String(getParam(req, 'q') || '').trim().slice(0, 120);
+  const offset = Math.max(0, Number(getParam(req, 'offset') || 0));
+  const limit = Math.max(1, Math.min(20, Number(getParam(req, 'limit') || process.env.STORES_PER_BATCH || 8)));
+  const storeIds = String(getParam(req, 'stores') || '')
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean)
+    .slice(0, 20);
+
   if (!query) {
     res.statusCode = 400;
     return res.end(JSON.stringify({ ok: false, message: 'Parameter q wajib diisi.' }));
   }
 
   try {
-    const result = await searchPrices(query);
+    const result = await searchPrices(query, { offset, limit, storeIds });
     res.statusCode = result.ok ? 200 : 404;
     return res.end(JSON.stringify(result));
   } catch (error) {
