@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Bandingkan harga top up game dari berbagai toko online Indonesia secara real-time.">
+  <title>TopUp Scout — Cari Harga Voucher Game Termurah</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="header-inner">
+      <a class="brand" href="/" aria-label="TopUp Scout">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M4 12.5 8.3 8l3.2 3.2L20 3"/><path d="M20 8V3h-5"/><path d="M20 13v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h5"/></svg>
+        </span>
+        <span>
+          <strong>TopUp Scout</strong>
+          <small>Game price comparison</small>
+        </span>
+      </a>
+      <div class="header-actions">
+        <span class="system-pill"><i></i> Real-time tanpa cache</span>
+        <button class="icon-button" id="themeButton" type="button" aria-label="Ubah tema">
+          <svg class="sun-icon" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.42-1.41M17.66 6.34l1.41-1.41"/></svg>
+          <svg class="moon-icon" viewBox="0 0 24 24" fill="none"><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8Z"/></svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="hero-grid"></div>
+      <div class="hero-content">
+        <span class="eyebrow">SMART TOP-UP PRICE FINDER</span>
+        <h1>Cari voucher game.<br><span>Temukan harga termurah.</span></h1>
+        <p>Bandingkan harga paket yang setara dari berbagai toko top-up Indonesia dalam satu pencarian.</p>
+
+        <form id="searchForm" class="search-box" autocomplete="off">
+          <div class="search-input-wrap">
+            <svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+            <input id="searchInput" type="search" placeholder="Cari Mobile Legends, MLBB, Free Fire..." aria-label="Nama game" maxlength="120">
+          </div>
+          <button id="searchButton" type="submit">
+            <span>Cari Harga</span>
+            <svg viewBox="0 0 24 24" fill="none"><path d="m9 18 6-6-6-6"/></svg>
+          </button>
+          <div id="suggestions" class="suggestions" hidden></div>
+        </form>
+
+        <div class="popular-searches">
+          <span>Populer:</span>
+          <button data-query="Mobile Legends">Mobile Legends</button>
+          <button data-query="Free Fire">Free Fire</button>
+          <button data-query="PUBG Mobile">PUBG Mobile</button>
+          <button data-query="Genshin Impact">Genshin Impact</button>
+          <button data-query="VALORANT">VALORANT</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="content-shell" id="contentShell">
+      <div id="initialState" class="initial-state">
+        <div class="initial-visual">
+          <div class="radar-ring ring-one"></div>
+          <div class="radar-ring ring-two"></div>
+          <div class="radar-ring ring-three"></div>
+          <div class="radar-core">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M3 17 9 11l4 4 8-9"/><path d="M15 6h6v6"/></svg>
+          </div>
+          <span class="store-dot dot-one">C</span>
+          <span class="store-dot dot-two">U</span>
+          <span class="store-dot dot-three">L</span>
+          <span class="store-dot dot-four">DG</span>
+        </div>
+        <div>
+          <h2>Satu pencarian, banyak toko</h2>
+          <p>Masukkan nama game untuk mengambil harga langsung dari setiap sumber. Hasil dikelompokkan berdasarkan paket yang setara dan diurutkan dari harga terendah.</p>
+          <div class="feature-list">
+            <span><svg viewBox="0 0 24 24" fill="none"><path d="m5 12 4 4L19 6"/></svg> Tanpa database</span>
+            <span><svg viewBox="0 0 24 24" fill="none"><path d="m5 12 4 4L19 6"/></svg> Tanpa cache</span>
+            <span><svg viewBox="0 0 24 24" fill="none"><path d="m5 12 4 4L19 6"/></svg> Status sumber transparan</span>
+          </div>
+        </div>
+      </div>
+
+      <div id="loadingState" class="loading-state" hidden>
+        <div class="loading-heading">
+          <div class="spinner"></div>
+          <div>
+            <h2>Mencari harga terbaik...</h2>
+            <p>Menghubungi seluruh toko secara paralel. Toko yang lambat akan dilewati setelah timeout.</p>
+          </div>
+        </div>
+        <div class="loading-stores">
+          <div class="loading-store"><span>C</span><div><strong>Codashop</strong><i></i></div></div>
+          <div class="loading-store"><span>U</span><div><strong>UniPin</strong><i></i></div></div>
+          <div class="loading-store"><span>L</span><div><strong>Lapakgaming</strong><i></i></div></div>
+          <div class="loading-store"><span>DG</span><div><strong>Dunia Games</strong><i></i></div></div>
+        </div>
+      </div>
+
+      <div id="errorState" class="error-state" hidden>
+        <div class="error-icon">
+          <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/></svg>
+        </div>
+        <h2 id="errorTitle">Pencarian gagal</h2>
+        <p id="errorMessage"></p>
+        <button id="retryButton" type="button">Coba Lagi</button>
+      </div>
+
+      <div id="resultsState" hidden>
+        <section class="result-header-card">
+          <div class="game-summary">
+            <div id="gameIcon" class="game-icon">ML</div>
+            <div>
+              <div class="result-kicker">HASIL PENCARIAN</div>
+              <h2 id="gameName">Mobile Legends</h2>
+              <p><span id="packageCount">0</span> paket · <span id="storeCount">0</span> toko · dicek <span id="checkedTime">sekarang</span></p>
+            </div>
+          </div>
+          <div class="result-meta">
+            <div class="meta-stat">
+              <span>Harga mulai</span>
+              <strong id="startingPrice">Rp0</strong>
+            </div>
+            <div class="meta-stat">
+              <span>Waktu pencarian</span>
+              <strong id="duration">0 ms</strong>
+            </div>
+            <button id="refreshButton" class="refresh-button" type="button">
+              <svg viewBox="0 0 24 24" fill="none"><path d="M20 12a8 8 0 1 1-2.34-5.66L20 8"/><path d="M20 3v5h-5"/></svg>
+              Ambil Ulang
+            </button>
+          </div>
+        </section>
+
+        <section id="fallbackNotice" class="notice fallback-notice" hidden>
+          <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg>
+          <div><strong>Sebagian hasil memakai data fallback demo.</strong><span>Toko yang gagal diakses tetap ditampilkan untuk menguji UI. Nonaktifkan melalui <code>ALLOW_DEMO_FALLBACK=false</code>.</span></div>
+        </section>
+
+        <section class="provider-panel">
+          <div class="section-heading">
+            <div>
+              <span class="section-kicker">SUMBER HARGA</span>
+              <h3>Status toko</h3>
+            </div>
+            <button id="toggleProviders" type="button">Sembunyikan</button>
+          </div>
+          <div id="providerStatuses" class="provider-statuses"></div>
+        </section>
+
+        <section class="toolbar">
+          <div class="toolbar-left">
+            <div class="filter-group">
+              <label for="typeFilter">Jenis paket</label>
+              <select id="typeFilter">
+                <option value="all">Semua paket</option>
+                <option value="currency">Currency</option>
+                <option value="weekly-pass">Weekly Pass</option>
+                <option value="membership">Membership</option>
+                <option value="welkin">Welkin</option>
+                <option value="other">Lainnya</option>
+              </select>
+            </div>
+            <div class="filter-group">
+              <label for="storeFilter">Toko</label>
+              <select id="storeFilter"><option value="all">Semua toko</option></select>
+            </div>
+          </div>
+          <div class="filter-group sort-group">
+            <label for="sortSelect">Urutkan</label>
+            <select id="sortSelect">
+              <option value="price-asc">Harga termurah</option>
+              <option value="amount-asc">Nominal terkecil</option>
+              <option value="stores-desc">Toko terbanyak</option>
+              <option value="savings-desc">Potensi hemat</option>
+            </select>
+          </div>
+        </section>
+
+        <section class="packages-section">
+          <div class="section-heading package-heading">
+            <div>
+              <span class="section-kicker">PERBANDINGAN PAKET</span>
+              <h3>Harga termurah per paket</h3>
+            </div>
+            <span id="visibleCount" class="visible-count"></span>
+          </div>
+          <div id="packageList" class="package-list"></div>
+          <div id="emptyFilterState" class="empty-filter" hidden>
+            <h3>Tidak ada paket yang sesuai</h3>
+            <p>Ubah filter jenis paket atau toko untuk melihat hasil lainnya.</p>
+          </div>
+        </section>
+
+        <section class="notice disclaimer">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M12 3 2.5 20h19L12 3Z"/><path d="M12 9v5M12 17h.01"/></svg>
+          <div><strong>Periksa harga final sebelum membayar.</strong><span id="resultNotice">Biaya admin, metode pembayaran, promo, dan syarat akun dapat mengubah harga saat checkout.</span></div>
+        </section>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <p>TopUp Scout membandingkan informasi harga dan mengarahkan transaksi ke toko asal. Tidak berafiliasi dengan publisher game atau toko yang ditampilkan.</p>
+  </footer>
+
+  <template id="packageTemplate">
+    <article class="package-card">
+      <button class="package-summary" type="button" aria-expanded="false">
+        <div class="package-main">
+          <div class="package-badge"><span></span></div>
+          <div>
+            <div class="package-title-row"><h4></h4><span class="live-badge">LIVE</span></div>
+            <p class="package-subtitle"></p>
+          </div>
+        </div>
+        <div class="package-price">
+          <span>Termurah mulai</span>
+          <strong></strong>
+          <small></small>
+        </div>
+        <div class="package-saving">
+          <span>Potensi hemat</span>
+          <strong></strong>
+        </div>
+        <svg class="chevron" viewBox="0 0 24 24" fill="none"><path d="m6 9 6 6 6-6"/></svg>
+      </button>
+      <div class="offer-comparison" hidden>
+        <div class="offer-table-header">
+          <span>Toko</span><span>Nama produk</span><span>Harga tercantum</span><span>Status</span><span></span>
+        </div>
+        <div class="offer-rows"></div>
+      </div>
+    </article>
+  </template>
+
+  <script src="/app.js" defer></script>
+</body>
+</html>
