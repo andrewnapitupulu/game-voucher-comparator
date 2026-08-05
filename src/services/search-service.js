@@ -1,10 +1,11 @@
 'use strict';
 
 const { findLocalGame, GAME_BY_ID } = require('../config/games');
+const { STORE_BY_ID } = require('../config/stores');
 const { resolveGameWithAi } = require('./ai-game-resolver');
 const { groupOffers } = require('./normalizer');
 const { makeFallbackOffers } = require('../data/fallback-offers');
-const { getStoreAdapters } = require('../stores');
+const { getStoreAdapters, getStoreAdapterCount } = require('../stores');
 
 function envBoolean(name, fallback) {
   const value = process.env[name];
@@ -25,10 +26,13 @@ async function resolveGame(query) {
   return { game: null, resolver: 'none' };
 }
 
-async function searchPrices(query) {
+async function searchPrices(query, options = {}) {
   const startedAt = Date.now();
-  const timeoutMs = Math.max(1500, Math.min(15000, Number(process.env.STORE_TIMEOUT_MS || 6500)));
-  const allowFallback = envBoolean('ALLOW_DEMO_FALLBACK', true);
+  const timeoutMs = Math.max(1500, Math.min(10000, Number(process.env.STORE_TIMEOUT_MS || 4200)));
+  const allowFallback = envBoolean('ALLOW_DEMO_FALLBACK', false);
+  const offset = Math.max(0, Number(options.offset) || 0);
+  const limit = Math.max(1, Math.min(20, Number(options.limit) || 8));
+  const storeIds = Array.isArray(options.storeIds) ? options.storeIds : [];
   const { game, resolver } = await resolveGame(query);
 
   if (!game) {
@@ -39,7 +43,8 @@ async function searchPrices(query) {
     };
   }
 
-  const adapters = getStoreAdapters();
+  const totalStoreCount = getStoreAdapterCount();
+  const adapters = getStoreAdapters({ offset, limit, storeIds });
   const results = await Promise.allSettled(
     adapters.map(async (adapter) => ({
       adapter,
@@ -50,11 +55,18 @@ async function searchPrices(query) {
   const liveOffers = [];
   const providerStatus = results.map((result, index) => {
     const adapter = adapters[index];
+    const registry = STORE_BY_ID[adapter.id] || {};
+    const common = {
+      id: adapter.id,
+      name: adapter.name,
+      category: adapter.category || registry.category || 'partner',
+      verification: adapter.verification || registry.verification || 'feed'
+    };
+
     if (result.status === 'fulfilled') {
       liveOffers.push(...result.value.offers);
       return {
-        id: adapter.id,
-        name: adapter.name,
+        ...common,
         ok: true,
         mode: 'live',
         count: result.value.offers.length,
@@ -63,8 +75,7 @@ async function searchPrices(query) {
     }
 
     return {
-      id: adapter.id,
-      name: adapter.name,
+      ...common,
       ok: false,
       mode: 'error',
       count: 0,
@@ -76,8 +87,14 @@ async function searchPrices(query) {
   let fallbackUsed = false;
 
   if (allowFallback) {
+    const fallbackCatalog = makeFallbackOffers(game);
+    const selectedStoreIds = adapters.length
+      ? new Set(adapters.map((adapter) => adapter.id))
+      : new Set(fallbackCatalog.map((offer) => offer.storeId));
     const successfulStoreIds = new Set(liveOffers.map((offer) => offer.storeId));
-    const fallbackForFailedStores = makeFallbackOffers(game).filter((offer) => !successfulStoreIds.has(offer.storeId));
+    const fallbackForFailedStores = fallbackCatalog.filter(
+      (offer) => selectedStoreIds.has(offer.storeId) && !successfulStoreIds.has(offer.storeId)
+    );
     if (fallbackForFailedStores.length) {
       offers = [...liveOffers, ...fallbackForFailedStores];
       fallbackUsed = true;
@@ -86,6 +103,7 @@ async function searchPrices(query) {
 
   const groups = groupOffers(offers);
   const cheapestOverall = groups[0] || null;
+  const nextOffset = storeIds.length ? null : offset + adapters.length;
 
   return {
     ok: true,
@@ -107,10 +125,18 @@ async function searchPrices(query) {
     offerCount: offers.length,
     packageCount: groups.length,
     storeCount: new Set(offers.map((offer) => offer.storeId)).size,
+    checkedStoreCount: adapters.length,
+    totalStoreCount,
+    batch: {
+      offset,
+      limit,
+      nextOffset,
+      hasMore: nextOffset !== null && nextOffset < totalStoreCount
+    },
     cheapestOverall,
     providerStatus,
     groups,
-    notice: 'Harga adalah harga yang terbaca dari halaman/feed sumber. Biaya admin dan promo bersyarat dapat berbeda saat checkout.'
+    notice: 'Harga diambil real-time per batch tanpa database dan cache. Biaya admin, promo bersyarat, dan harga checkout dapat berbeda.'
   };
 }
 
