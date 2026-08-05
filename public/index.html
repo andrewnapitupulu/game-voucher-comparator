@@ -75,8 +75,8 @@
           <span class="store-dot dot-four">DG</span>
         </div>
         <div>
-          <h2>Satu pencarian, banyak toko</h2>
-          <p>Masukkan nama game untuk mengambil harga langsung dari setiap sumber. Hasil dikelompokkan berdasarkan paket yang setara dan diurutkan dari harga terendah.</p>
+          <h2>Satu pencarian, 99 toko</h2>
+          <p>Masukkan nama game untuk mengambil harga langsung dari registry 99 sumber. Hasil dikelompokkan berdasarkan paket yang setara dan diurutkan dari harga terendah.</p>
           <div class="feature-list">
             <span><svg viewBox="0 0 24 24" fill="none"><path d="m5 12 4 4L19 6"/></svg> Tanpa database</span>
             <span><svg viewBox="0 0 24 24" fill="none"><path d="m5 12 4 4L19 6"/></svg> Tanpa cache</span>
@@ -90,14 +90,14 @@
           <div class="spinner"></div>
           <div>
             <h2>Mencari harga terbaik...</h2>
-            <p>Menghubungi seluruh toko secara paralel. Toko yang lambat akan dilewati setelah timeout.</p>
+            <p>Menyiapkan pencarian bertahap ke 99 toko. Hasil pertama akan tampil lebih dulu, lalu terus diperbarui.</p>
           </div>
         </div>
         <div class="loading-stores">
-          <div class="loading-store"><span>C</span><div><strong>Codashop</strong><i></i></div></div>
-          <div class="loading-store"><span>U</span><div><strong>UniPin</strong><i></i></div></div>
-          <div class="loading-store"><span>L</span><div><strong>Lapakgaming</strong><i></i></div></div>
-          <div class="loading-store"><span>DG</span><div><strong>Dunia Games</strong><i></i></div></div>
+          <div class="loading-store"><span>01</span><div><strong>Batch toko pertama</strong><i></i></div></div>
+          <div class="loading-store"><span>99</span><div><strong>Registry sumber</strong><i></i></div></div>
+          <div class="loading-store"><span>RT</span><div><strong>Harga real-time</strong><i></i></div></div>
+          <div class="loading-store"><span>NC</span><div><strong>Tanpa cache</strong><i></i></div></div>
         </div>
       </div>
 
@@ -134,6 +134,14 @@
               Ambil Ulang
             </button>
           </div>
+        </section>
+
+        <section id="searchProgress" class="search-progress" hidden>
+          <div class="search-progress-copy">
+            <strong id="progressText">Sedang memeriksa toko 0 dari 99</strong>
+            <span>Setiap batch berisi maksimal 8 toko agar request tidak mudah timeout.</span>
+          </div>
+          <div class="progress-track" aria-hidden="true"><span id="progressFill"></span></div>
         </section>
 
         <section id="fallbackNotice" class="notice fallback-notice" hidden>
