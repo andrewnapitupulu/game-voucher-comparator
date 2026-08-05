@@ -355,3 +355,26 @@ footer { max-width: 1180px; margin: 0 auto; padding: 0 28px 38px; color: var(--m
   .result-meta { grid-template-columns: 1fr; }
   .package-price { padding-left: 0; }
 }
+
+.search-progress {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) minmax(220px, 420px);
+  align-items: center;
+  gap: 18px;
+  padding: 15px 18px;
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+.search-progress-copy strong { display: block; margin-bottom: 3px; font-size: 11px; }
+.search-progress-copy span { color: var(--muted); font-size: 9px; line-height: 1.5; }
+.progress-track { height: 8px; overflow: hidden; border-radius: 999px; background: var(--teal-soft); }
+.progress-track span { display: block; width: 0; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--teal), var(--teal-dark)); transition: width .25s ease; }
+.search-progress.complete { border-color: color-mix(in srgb, var(--green) 28%, var(--border)); }
+.search-progress.complete .progress-track span { background: var(--green); }
+.provider-statuses { max-height: 520px; overflow: auto; padding-right: 3px; scrollbar-width: thin; }
+
+@media (max-width: 720px) {
+  .search-progress { grid-template-columns: 1fr; }
+}
