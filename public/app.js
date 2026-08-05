@@ -39,6 +39,9 @@ const elements = {
   visibleCount: document.querySelector('#visibleCount'),
   emptyFilter: document.querySelector('#emptyFilterState'),
   resultNotice: document.querySelector('#resultNotice'),
+  searchProgress: document.querySelector('#searchProgress'),
+  progressText: document.querySelector('#progressText'),
+  progressFill: document.querySelector('#progressFill'),
   template: document.querySelector('#packageTemplate')
 };
 
@@ -46,7 +49,8 @@ const state = {
   query: '',
   response: null,
   providerPanelVisible: true,
-  controller: null
+  controller: null,
+  searchStartedAt: 0
 };
 
 function rupiah(value) {
@@ -88,6 +92,94 @@ function showError(title, message) {
   showView('error');
 }
 
+function recomputeGroup(group) {
+  const offers = [...group.offers].sort((a, b) => a.finalPrice - b.finalPrice || a.storeName.localeCompare(b.storeName, 'id'));
+  const cheapest = offers[0];
+  const highest = offers[offers.length - 1];
+  return {
+    ...group,
+    offers,
+    cheapestPrice: cheapest?.finalPrice || 0,
+    cheapestStore: cheapest?.storeName || '—',
+    highestPrice: highest?.finalPrice || 0,
+    savings: cheapest && highest ? Math.max(0, highest.finalPrice - cheapest.finalPrice) : 0,
+    storeCount: new Set(offers.map((offer) => offer.storeId)).size,
+    hasLivePrice: offers.some((offer) => offer.source === 'live')
+  };
+}
+
+function mergeBatch(current, batch) {
+  const aggregate = current || {
+    ...batch,
+    providerStatus: [],
+    groups: [],
+    checkedStoreCount: 0,
+    durationMs: 0,
+    fallbackUsed: false
+  };
+
+  aggregate.game = batch.game;
+  aggregate.query = batch.query;
+  aggregate.resolver = batch.resolver;
+  aggregate.totalStoreCount = batch.totalStoreCount;
+  aggregate.checkedStoreCount += batch.checkedStoreCount;
+  aggregate.fallbackUsed = aggregate.fallbackUsed || batch.fallbackUsed;
+  aggregate.fetchedAt = batch.fetchedAt;
+  aggregate.notice = batch.notice;
+  aggregate.durationMs = Date.now() - state.searchStartedAt;
+
+  const providerMap = new Map(aggregate.providerStatus.map((provider) => [provider.id, provider]));
+  batch.providerStatus.forEach((provider) => providerMap.set(provider.id, provider));
+  aggregate.providerStatus = [...providerMap.values()];
+
+  const groupMap = new Map(aggregate.groups.map((group) => [group.id, { ...group, offers: [...group.offers] }]));
+  for (const incoming of batch.groups) {
+    const target = groupMap.get(incoming.id) || { ...incoming, offers: [] };
+    const seen = new Set(target.offers.map((offer) => `${offer.storeId}|${offer.originalName}|${offer.finalPrice}`));
+    for (const offer of incoming.offers) {
+      const key = `${offer.storeId}|${offer.originalName}|${offer.finalPrice}`;
+      if (!seen.has(key)) {
+        target.offers.push(offer);
+        seen.add(key);
+      }
+    }
+    groupMap.set(incoming.id, recomputeGroup(target));
+  }
+
+  aggregate.groups = [...groupMap.values()].sort((a, b) => a.cheapestPrice - b.cheapestPrice || a.name.localeCompare(b.name, 'id'));
+  aggregate.packageCount = aggregate.groups.length;
+  aggregate.cheapestOverall = aggregate.groups[0] || null;
+  aggregate.offerCount = aggregate.groups.reduce((sum, group) => sum + group.offers.length, 0);
+  aggregate.liveOfferCount = aggregate.groups.reduce((sum, group) => sum + group.offers.filter((offer) => offer.source === 'live').length, 0);
+  aggregate.storeCount = new Set(aggregate.groups.flatMap((group) => group.offers.map((offer) => offer.storeId))).size;
+  return aggregate;
+}
+
+function updateSearchProgress(data, complete = false) {
+  if (!data) return;
+  const checked = Math.min(data.checkedStoreCount || 0, data.totalStoreCount || 99);
+  const total = data.totalStoreCount || 99;
+  const percent = Math.round((checked / total) * 100);
+  elements.searchProgress.hidden = false;
+  elements.progressText.textContent = complete
+    ? `Selesai memeriksa ${checked} dari ${total} toko`
+    : `Sedang memeriksa toko ${checked} dari ${total} · hasil diperbarui otomatis`;
+  elements.progressFill.style.width = `${percent}%`;
+  elements.searchProgress.classList.toggle('complete', complete);
+}
+
+async function fetchBatch(query, offset, limit, signal) {
+  const response = await fetch(`/api/search?q=${encodeURIComponent(query)}&offset=${offset}&limit=${limit}&_=${Date.now()}`, {
+    method: 'GET',
+    cache: 'no-store',
+    headers: { accept: 'application/json' },
+    signal
+  });
+  const payload = await response.json();
+  if (!response.ok || !payload.ok) throw new Error(payload.message || 'Harga tidak dapat ditemukan.');
+  return payload;
+}
+
 async function search(query) {
   const cleanQuery = String(query || '').trim();
   if (!cleanQuery) {
@@ -97,32 +189,65 @@ async function search(query) {
 
   if (state.controller) state.controller.abort();
   state.controller = new AbortController();
+  state.searchStartedAt = Date.now();
   state.query = cleanQuery;
+  state.response = null;
   elements.input.value = cleanQuery;
   elements.suggestions.hidden = true;
+  elements.searchProgress.hidden = true;
+  elements.searchProgress.classList.remove('complete');
+  elements.progressFill.style.width = '0%';
   setSearching(true);
   showView('loading');
   window.scrollTo({ top: document.querySelector('#contentShell').offsetTop - 95, behavior: 'smooth' });
 
+  const batchSize = 8;
   try {
-    const response = await fetch(`/api/search?q=${encodeURIComponent(cleanQuery)}&_=${Date.now()}`, {
-      method: 'GET',
-      cache: 'no-store',
-      headers: { accept: 'application/json' },
-      signal: state.controller.signal
-    });
-    const payload = await response.json();
+    const first = await fetchBatch(cleanQuery, 0, batchSize, state.controller.signal);
+    state.response = mergeBatch(null, first);
+    renderResults(state.response);
+    updateSearchProgress(state.response, !first.batch.hasMore);
+    showView('results');
 
-    if (!response.ok || !payload.ok) {
-      throw new Error(payload.message || 'Harga tidak dapat ditemukan.');
+    if (first.batch.hasMore) {
+      const offsets = [];
+      for (let offset = first.batch.nextOffset; offset < first.totalStoreCount; offset += batchSize) offsets.push(offset);
+      let cursor = 0;
+      const workerCount = Math.min(3, offsets.length);
+
+      async function worker() {
+        while (cursor < offsets.length) {
+          const offset = offsets[cursor++];
+          try {
+            const batch = await fetchBatch(first.game.id, offset, batchSize, state.controller.signal);
+            state.response = mergeBatch(state.response, batch);
+            renderResults(state.response);
+            updateSearchProgress(state.response, state.response.checkedStoreCount >= state.response.totalStoreCount);
+          } catch (error) {
+            if (error.name === 'AbortError') throw error;
+            state.response.checkedStoreCount = Math.min(state.response.totalStoreCount, state.response.checkedStoreCount + batchSize);
+            state.response.durationMs = Date.now() - state.searchStartedAt;
+            updateSearchProgress(state.response, state.response.checkedStoreCount >= state.response.totalStoreCount);
+          }
+        }
+      }
+
+      await Promise.all(Array.from({ length: workerCount }, () => worker()));
     }
 
-    state.response = payload;
-    renderResults(payload);
-    showView('results');
+    state.response.durationMs = Date.now() - state.searchStartedAt;
+    renderResults(state.response);
+    updateSearchProgress(state.response, true);
   } catch (error) {
     if (error.name === 'AbortError') return;
-    showError('Pencarian belum berhasil', error.message || 'Coba ulangi pencarian beberapa saat lagi.');
+    if (state.response?.groups?.length) {
+      state.response.durationMs = Date.now() - state.searchStartedAt;
+      renderResults(state.response);
+      updateSearchProgress(state.response, true);
+      showView('results');
+    } else {
+      showError('Pencarian belum berhasil', error.message || 'Coba ulangi pencarian beberapa saat lagi.');
+    }
   } finally {
     setSearching(false);
   }
@@ -154,7 +279,8 @@ function renderProviders(data) {
   for (const provider of data.providerStatus) {
     const isFallback = !provider.ok && sourceStores.has(provider.id);
     const mode = provider.ok ? 'live' : isFallback ? 'fallback' : 'error';
-    const label = provider.ok ? provider.message : isFallback ? 'Data fallback demo' : provider.message;
+    const verificationLabel = provider.verification === 'candidate' ? ' · kandidat' : '';
+    const label = `${provider.ok ? provider.message : isFallback ? 'Data fallback demo' : provider.message}${verificationLabel}`;
 
     const card = document.createElement('div');
     card.className = 'provider-card';
