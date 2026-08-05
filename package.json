@@ -1,0 +1,17 @@
+{
+  "name": "game-price-comparator-no-db",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Pembanding harga top up game Indonesia tanpa database dan cache.",
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": "24.x"
+  },
+  "license": "MIT"
+}
