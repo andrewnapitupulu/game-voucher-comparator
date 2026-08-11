@@ -22,10 +22,13 @@ const GAMES = [
     stores: {
       codashop:
         'https://www.codashop.com/id-id/mobile-legends',
+
       unipin:
         'https://www.unipin.com/id/mobile-legends',
+
       lapakgaming:
         'https://www.lapakgaming.com/id-id/mobile-legends',
+
       duniagames:
         'https://duniagames.co.id/top-up/item/mobile-legends'
     }
@@ -50,10 +53,13 @@ const GAMES = [
     stores: {
       codashop:
         'https://www.codashop.com/id-id/free-fire',
+
       unipin:
         'https://www.unipin.com/id/garena/free-fire',
+
       lapakgaming:
         'https://www.lapakgaming.com/id-id/free-fire',
+
       duniagames:
         'https://duniagames.co.id/top-up/item/free-fire'
     }
@@ -78,10 +84,13 @@ const GAMES = [
     stores: {
       codashop:
         'https://www.codashop.com/id-id/pubg-mobile-uc-redeem-code',
+
       unipin:
         'https://www.unipin.com/id/pubg-mobile',
+
       lapakgaming:
         'https://www.lapakgaming.com/id-id/pubg-mobile',
+
       duniagames:
         'https://duniagames.co.id/top-up/item/pubg-mobile'
     }
@@ -109,10 +118,13 @@ const GAMES = [
     stores: {
       codashop:
         'https://www.codashop.com/id-id/genshin-impact',
+
       unipin:
         'https://www.unipin.com/id/genshin-impact',
+
       lapakgaming:
         'https://www.lapakgaming.com/id-id/genshin-impact',
+
       duniagames:
         'https://duniagames.co.id/top-up/item/genshin-impact'
     }
@@ -138,10 +150,13 @@ const GAMES = [
     stores: {
       codashop:
         'https://www.codashop.com/id-id/valorant',
+
       unipin:
         'https://www.unipin.com/id/valorant',
+
       lapakgaming:
         'https://www.lapakgaming.com/id-id/valorant',
+
       duniagames:
         'https://duniagames.co.id/top-up/item/valorant'
     }
@@ -348,8 +363,7 @@ const GAMES = [
       'endfield',
 
       /*
-       * Tetap didukung karena sebelumnya
-       * Anda mengetik "Enfield".
+       * Typo "Enfield" tetap didukung.
        */
       'arknights enfield',
       'arknights: enfield',
@@ -363,6 +377,95 @@ const GAMES = [
     stores: {
       lapakgaming:
         'https://www.lapakgaming.com/id-id/arknights-endfield'
+    }
+  },
+
+  /*
+   * ======================================================
+   * ZENLESS ZONE ZERO
+   * ======================================================
+   */
+  {
+    id: 'zenless-zone-zero',
+    name: 'Zenless Zone Zero',
+    shortName: 'Zenless Zone Zero',
+    publisher: 'HoYoverse',
+    icon: 'ZZ',
+    aliases: [
+      'zenless zone zero',
+      'zenless',
+      'zzz',
+      'zenless zone',
+      'monochrome',
+      'inter knot membership',
+      'inter-knot membership'
+    ],
+    unitAliases: [
+      'monochrome'
+    ],
+    stores: {
+      lapakgaming:
+        'https://www.lapakgaming.com/id-id/zenless-zone-zero'
+    }
+  },
+
+  /*
+   * ======================================================
+   * HONKAI STAR RAIL
+   * ======================================================
+   */
+  {
+    id: 'honkai-star-rail',
+    name: 'Honkai: Star Rail',
+    shortName: 'Honkai Star Rail',
+    publisher: 'HoYoverse',
+    icon: 'HS',
+    aliases: [
+      'honkai star rail',
+      'honkai: star rail',
+      'star rail',
+      'hsr',
+      'oneiric shard',
+      'oneiric shards',
+      'express supply pass'
+    ],
+    unitAliases: [
+      'oneiric shard',
+      'oneiric shards'
+    ],
+    stores: {
+      lapakgaming:
+        'https://www.lapakgaming.com/id-id/honkai-star-rail'
+    }
+  },
+
+  /*
+   * ======================================================
+   * CHAOS ZERO NIGHTMARE
+   * ======================================================
+   */
+  {
+    id: 'chaos-zero-nightmare',
+    name: 'Chaos Zero Nightmare',
+    shortName: 'Chaos Zero Nightmare',
+    publisher: 'Smilegate',
+    icon: 'CZ',
+    aliases: [
+      'chaos zero nightmare',
+      'chaos zero',
+      'czn',
+      'chaos nightmare',
+      'coronomicon monthly package',
+      'special data',
+      'zero data'
+    ],
+    unitAliases: [
+      'crystal',
+      'crystals'
+    ],
+    stores: {
+      lapakgaming:
+        'https://www.lapakgaming.com/id-id/chaos-zero-nightmare-login'
     }
   }
 ];
@@ -502,7 +605,6 @@ function findLocalGame(query) {
       .map(
         (game) => ({
           game,
-
           score:
             scoreGame(
               game,
