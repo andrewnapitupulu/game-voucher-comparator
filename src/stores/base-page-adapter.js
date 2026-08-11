@@ -9,11 +9,19 @@ const {
 const {
   htmlToLines,
   sliceLines,
+  isProductName,
   extractOffersFromLines,
   extractJsonScriptOffers,
   dedupeOffers
 } = require(
   '../utils/html'
+);
+
+const {
+  extractStructuredOffers,
+  detectDynamicPageSignals
+} = require(
+  '../utils/structured-data'
 );
 
 function providerError(
@@ -37,6 +45,123 @@ function providerError(
   return error;
 }
 
+function buildParserDiagnostics({
+  html,
+  allLines,
+  parsedLines,
+  lineOffers,
+  jsonOffers,
+  structured
+}) {
+  const visibleProductCandidates =
+    parsedLines.filter(
+      (line) =>
+        isProductName(
+          line
+        )
+    ).length;
+
+  const visiblePriceCandidates =
+    parsedLines.filter(
+      (line) =>
+        /(?:\bIDR\b|\bRp\.?)/i.test(
+          line
+        )
+    ).length;
+
+  const dynamic =
+    structured
+      ?.diagnostics
+      ?.dynamic ||
+    detectDynamicPageSignals(
+      html
+    );
+
+  let parserReason =
+    'UNSUPPORTED_STRUCTURE';
+
+  if (
+    lineOffers.length ||
+    jsonOffers.length ||
+    structured
+      ?.offers
+      ?.length
+  ) {
+    parserReason =
+      'PARTIAL_MATCH_ONLY';
+  } else if (
+    dynamic.likelyDynamic
+  ) {
+    parserReason =
+      'JS_RENDERED_CONTENT';
+  } else if (
+    visibleProductCandidates >
+      0 &&
+    visiblePriceCandidates ===
+      0
+  ) {
+    parserReason =
+      'PRODUCT_FOUND_NO_PRICE';
+  } else if (
+    visibleProductCandidates ===
+      0 &&
+    visiblePriceCandidates >
+      0
+  ) {
+    parserReason =
+      'PRICE_FOUND_NO_PRODUCT';
+  } else if (
+    (
+      structured
+        ?.diagnostics
+        ?.documentCount ||
+      0
+    ) >
+    0
+  ) {
+    parserReason =
+      'JSON_DATA_FOUND_NO_MATCH';
+  } else if (
+    visibleProductCandidates ===
+    0
+  ) {
+    parserReason =
+      'HTML_NO_PRODUCT';
+  }
+
+  return {
+    parserReason,
+
+    pageLineCount:
+      allLines.length,
+
+    parsedLineCount:
+      parsedLines.length,
+
+    visibleProductCandidates,
+    visiblePriceCandidates,
+
+    lineOfferCount:
+      lineOffers.length,
+
+    legacyJsonOfferCount:
+      jsonOffers.length,
+
+    structuredOfferCount:
+      structured
+        ?.offers
+        ?.length ||
+      0,
+
+    structured:
+      structured
+        ?.diagnostics ||
+      null,
+
+    dynamic
+  };
+}
+
 async function fetchPageOffers({
   game,
   storeId,
@@ -48,38 +173,19 @@ async function fetchPageOffers({
   lineTransform
 }) {
   const purchaseUrl =
-    game?.stores?.[
-      storeId
-    ];
+    game
+      ?.stores
+      ?.[
+        storeId
+      ];
 
-  /*
-   * Ini berbeda dengan parser gagal.
-   *
-   * Berarti memang belum ada
-   * direct URL yang dikonfigurasi.
-   */
-  if (
-    !purchaseUrl
-  ) {
+  if (!purchaseUrl) {
     throw providerError(
       'NOT_CONFIGURED',
-
       'URL toko belum dikonfigurasi'
     );
   }
 
-  /*
-   * fetchText dapat menghasilkan:
-   *
-   * ACCESS_BLOCKED
-   * RATE_LIMITED
-   * PAGE_NOT_FOUND
-   * TIMEOUT
-   * NETWORK_ERROR
-   *
-   * Error tersebut diteruskan apa adanya
-   * ke search-service.
-   */
   const {
     text:
       html,
@@ -87,13 +193,17 @@ async function fetchPageOffers({
     finalUrl,
 
     contentType
-  } = await fetchText(
-    purchaseUrl,
+  } =
+    await fetchText(
+      purchaseUrl,
+      {
+        timeoutMs
+      }
+    );
 
-    {
-      timeoutMs
-    }
-  );
+  const resolvedUrl =
+    finalUrl ||
+    purchaseUrl;
 
   const allLines =
     htmlToLines(
@@ -109,98 +219,152 @@ async function fetchPageOffers({
 
   const lines =
     typeof lineTransform ===
-    'function'
+      'function'
       ? lineTransform(
           sliced
         )
       : sliced;
 
+  const context = {
+    purchaseUrl:
+      resolvedUrl,
+
+    storeId,
+    storeName,
+
+    gameId:
+      game.id,
+
+    source:
+      'live'
+  };
+
+  /*
+   * ======================================================
+   * LAYER 1
+   * HTML visible text parser
+   * ======================================================
+   */
+
   const lineOffers =
     extractOffersFromLines(
       lines,
-
       {
-        maxDistance,
-
-        purchaseUrl:
-          finalUrl ||
-          purchaseUrl,
-
-        storeId,
-        storeName,
-
-        gameId:
-          game.id,
-
-        source:
-          'live'
+        ...context,
+        maxDistance
       }
     );
+
+  /*
+   * ======================================================
+   * LAYER 2
+   * Legacy JSON object parser
+   * ======================================================
+   */
 
   const jsonOffers =
     extractJsonScriptOffers(
       html,
+      context
+    );
 
-      {
-        purchaseUrl:
-          finalUrl ||
-          purchaseUrl,
+  /*
+   * ======================================================
+   * LAYER 3
+   * Structured / embedded state parser
+   *
+   * Mendukung:
+   *
+   * JSON-LD
+   * application/json
+   * __NEXT_DATA__
+   * __NUXT__
+   * __INITIAL_STATE__
+   * __PRELOADED_STATE__
+   * __APOLLO_STATE__
+   * ======================================================
+   */
 
-        storeId,
-        storeName,
-
-        gameId:
-          game.id
-      }
+  const structured =
+    extractStructuredOffers(
+      html,
+      context
     );
 
   const offers =
     dedupeOffers([
       ...lineOffers,
-      ...jsonOffers
+      ...jsonOffers,
+      ...structured.offers
     ]);
 
-  /*
-   * PENTING:
-   *
-   * HTTP 200 + tidak ada offer
-   * BUKAN berarti toko tidak punya
-   * produk.
-   *
-   * Kemungkinan:
-   *
-   * - HTML berubah
-   * - harga dirender melalui JS
-   * - produk datang dari API internal
-   * - selector/parser belum cocok
-   *
-   * Karena itu sekarang statusnya
-   * PARSER_FAILED.
-   */
   if (
-    !offers.length
+    offers.length
   ) {
-    throw providerError(
-      'PARSER_FAILED',
-
-      'Halaman berhasil dibuka, tetapi harga/produk tidak terbaca dari HTML server',
-
-      {
-        finalUrl:
-          finalUrl ||
-          purchaseUrl,
-
-        contentType,
-
-        pageLineCount:
-          allLines.length
-      }
-    );
+    return offers;
   }
 
-  return offers;
+  const diagnostics =
+    buildParserDiagnostics({
+      html,
+      allLines,
+
+      parsedLines:
+        lines,
+
+      lineOffers,
+      jsonOffers,
+      structured
+    });
+
+  const reasonMessages = {
+    JS_RENDERED_CONTENT:
+      'Konten produk kemungkinan dimuat melalui JavaScript/API setelah halaman dibuka',
+
+    PRODUCT_FOUND_NO_PRICE:
+      'Nama produk ditemukan, tetapi harga tidak ditemukan pada HTML server',
+
+    PRICE_FOUND_NO_PRODUCT:
+      'Harga ditemukan, tetapi nama produk tidak dapat dikenali',
+
+    JSON_DATA_FOUND_NO_MATCH:
+      'Data JSON ditemukan, tetapi struktur produk/harganya belum dikenali',
+
+    HTML_NO_PRODUCT:
+      'Tidak ada kandidat produk yang dapat dikenali pada HTML server',
+
+    UNSUPPORTED_STRUCTURE:
+      'Struktur halaman belum didukung parser saat ini'
+  };
+
+  throw providerError(
+    'PARSER_FAILED',
+
+    reasonMessages[
+      diagnostics
+        .parserReason
+    ] ||
+    reasonMessages
+      .UNSUPPORTED_STRUCTURE,
+
+    {
+      parserReason:
+        diagnostics
+          .parserReason,
+
+      parserDiagnostics:
+        diagnostics,
+
+      finalUrl:
+        resolvedUrl,
+
+      contentType
+    }
+  );
 }
 
 module.exports = {
-  fetchPageOffers
+  fetchPageOffers,
+  providerError,
+  buildParserDiagnostics
 };
