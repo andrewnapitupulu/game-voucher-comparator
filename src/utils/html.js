@@ -1,6 +1,10 @@
 'use strict';
 
-const { parseRupiah } = require('./money');
+const {
+  parseRupiah
+} = require(
+  './money'
+);
 
 const ENTITY_MAP = {
   amp: '&',
@@ -11,114 +15,280 @@ const ENTITY_MAP = {
   nbsp: ' '
 };
 
-function decodeEntities(value) {
-  return String(value || '')
-    .replace(/&#(\d+);/g, (_, number) =>
-      String.fromCodePoint(Number(number))
+function decodeEntities(
+  value
+) {
+  return String(
+    value ||
+    ''
+  )
+    .replace(
+      /&#(\d+);/g,
+
+      (
+        _,
+        number
+      ) =>
+        String.fromCodePoint(
+          Number(number)
+        )
     )
-    .replace(/&#x([0-9a-f]+);/gi, (_, number) =>
-      String.fromCodePoint(parseInt(number, 16))
+
+    .replace(
+      /&#x([0-9a-f]+);/gi,
+
+      (
+        _,
+        number
+      ) =>
+        String.fromCodePoint(
+          parseInt(
+            number,
+            16
+          )
+        )
     )
+
     .replace(
       /&([a-z]+);/gi,
-      (match, entity) =>
-        ENTITY_MAP[entity.toLowerCase()] ?? match
+
+      (
+        match,
+        entity
+      ) =>
+        ENTITY_MAP[
+          entity.toLowerCase()
+        ] ??
+        match
     );
 }
 
-function htmlToLines(html, { keepScripts = false } = {}) {
-  let value = String(html || '');
+function htmlToLines(
+  html,
+  {
+    keepScripts = false
+  } = {}
+) {
+  let value =
+    String(
+      html ||
+      ''
+    );
 
   if (!keepScripts) {
-    value = value
-      .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, ' ')
-      .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, ' ')
-      .replace(/<noscript\b[^>]*>[\s\S]*?<\/noscript>/gi, ' ')
-      .replace(/<svg\b[^>]*>[\s\S]*?<\/svg>/gi, ' ');
+    value =
+      value
+
+        .replace(
+          /<script\b[^>]*>[\s\S]*?<\/script>/gi,
+          ' '
+        )
+
+        .replace(
+          /<style\b[^>]*>[\s\S]*?<\/style>/gi,
+          ' '
+        )
+
+        .replace(
+          /<noscript\b[^>]*>[\s\S]*?<\/noscript>/gi,
+          ' '
+        )
+
+        .replace(
+          /<svg\b[^>]*>[\s\S]*?<\/svg>/gi,
+          ' '
+        );
   }
 
   return decodeEntities(
     value
+
       .replace(
         /<(?:br|\/p|\/div|\/li|\/tr|\/td|\/th|\/h[1-6]|\/section|\/article)>/gi,
         '\n'
       )
-      .replace(/<[^>]+>/g, ' ')
+
+      .replace(
+        /<[^>]+>/g,
+        ' '
+      )
   )
-    .split(/\r?\n/)
-    .map((line) => line.replace(/\s+/g, ' ').trim())
-    .filter(Boolean);
+
+    .split(
+      /\r?\n/
+    )
+
+    .map(
+      (line) =>
+        line
+          .replace(
+            /\s+/g,
+            ' '
+          )
+          .trim()
+    )
+
+    .filter(
+      Boolean
+    );
 }
 
-function sliceLines(lines, startPatterns = [], endPatterns = []) {
-  const starts = startPatterns.map((pattern) =>
-    pattern instanceof RegExp
-      ? pattern
-      : new RegExp(pattern, 'i')
-  );
+function sliceLines(
+  lines,
+  startPatterns = [],
+  endPatterns = []
+) {
+  const starts =
+    startPatterns.map(
+      (pattern) =>
+        pattern instanceof RegExp
+          ? pattern
+          : new RegExp(
+              pattern,
+              'i'
+            )
+    );
 
-  const ends = endPatterns.map((pattern) =>
-    pattern instanceof RegExp
-      ? pattern
-      : new RegExp(pattern, 'i')
-  );
+  const ends =
+    endPatterns.map(
+      (pattern) =>
+        pattern instanceof RegExp
+          ? pattern
+          : new RegExp(
+              pattern,
+              'i'
+            )
+    );
 
   let start = 0;
 
-  for (let index = 0; index < lines.length; index += 1) {
-    if (starts.some((pattern) => pattern.test(lines[index]))) {
-      start = index + 1;
+  for (
+    let index = 0;
+    index <
+    lines.length;
+    index += 1
+  ) {
+    if (
+      starts.some(
+        (pattern) =>
+          pattern.test(
+            lines[index]
+          )
+      )
+    ) {
+      start =
+        index +
+        1;
+
       break;
     }
   }
 
-  let end = lines.length;
+  let end =
+    lines.length;
 
-  for (let index = start; index < lines.length; index += 1) {
-    if (ends.some((pattern) => pattern.test(lines[index]))) {
-      end = index;
+  for (
+    let index =
+      start;
+
+    index <
+    lines.length;
+
+    index += 1
+  ) {
+    if (
+      ends.some(
+        (pattern) =>
+          pattern.test(
+            lines[index]
+          )
+      )
+    ) {
+      end =
+        index;
+
       break;
     }
   }
 
-  return lines.slice(start, end);
-}
-
-const PRODUCT_UNIT_PATTERN =
-  '(?:diamond(?:s)?|uc|vp|point(?:s)?|genesis\\s+crystal(?:s)?|crystal(?:s)?|token(?:s)?|voucher(?:s)?|shell(?:s)?|coin(?:s)?|credit(?:s)?|cp)';
-
-function countProductAmounts(value) {
-  const text = String(value || '');
-
-  const matches = text.match(
-    new RegExp(
-      `\\b\\d[\\d.,]*\\s*(?:bonus\\s*)?${PRODUCT_UNIT_PATTERN}\\b`,
-      'gi'
-    )
+  return lines.slice(
+    start,
+    end
   );
-
-  return matches ? matches.length : 0;
 }
 
-/**
- * Harga seperti:
+/*
+ * Unit produk yang bisa dibaca
+ * universal HTML parser.
+ */
+const PRODUCT_UNIT_PATTERN =
+  '(?:' +
+  'lunar\\s+crystal(?:s)?|' +
+  'genesis\\s+crystal(?:s)?|' +
+  'rift\\s*crystal(?:s)?|' +
+  'riftcrystal(?:s)?|' +
+  'origeometry|' +
+  'starstone(?:s)?|' +
+  'opal(?:s)?|' +
+  'robux|' +
+  'diamond(?:s)?|' +
+  'uc|' +
+  'vp|' +
+  'point(?:s)?|' +
+  'crystal(?:s)?|' +
+  'token(?:s)?|' +
+  'voucher(?:s)?|' +
+  'shell(?:s)?|' +
+  'coin(?:s)?|' +
+  'credit(?:s)?|' +
+  'cp' +
+  ')';
+
+function countProductAmounts(
+  value
+) {
+  const text =
+    String(
+      value ||
+      ''
+    );
+
+  const matches =
+    text.match(
+      new RegExp(
+        `\\b\\d[\\d.,]*\\s*(?:bonus\\s*)?${PRODUCT_UNIT_PATTERN}\\b`,
+        'gi'
+      )
+    );
+
+  return matches
+    ? matches.length
+    : 0;
+}
+
+/*
+ * Jangan gunakan harga seperti:
  *
  * Rp74 ribuan
- * Rp 27 ribu
+ * Rp 20 ribu
  * Rp20rb
  * Rp20k
  *
- * bukan harga exact.
- *
- * Karena parseRupiah() bisa membaca
- * "Rp74 ribuan" sebagai 74,
- * teks seperti ini harus ditolak
- * sebelum masuk ke parseRupiah().
+ * sebagai harga exact.
  */
-function isApproximatePriceText(value) {
-  const text = String(value || '')
-    .replace(/\s+/g, ' ')
-    .trim();
+function isApproximatePriceText(
+  value
+) {
+  const text =
+    String(
+      value ||
+      ''
+    )
+      .replace(
+        /\s+/g,
+        ' '
+      )
+      .trim();
 
   if (!text) {
     return false;
@@ -129,22 +299,31 @@ function isApproximatePriceText(value) {
   );
 }
 
-function looksLikeUiInstruction(value) {
-  const text = String(value || '')
-    .replace(/\s+/g, ' ')
-    .trim();
+function looksLikeUiInstruction(
+  value
+) {
+  const text =
+    String(
+      value ||
+      ''
+    )
+      .replace(
+        /\s+/g,
+        ' '
+      )
+      .trim();
 
   if (!text) {
     return false;
   }
 
-  /**
-   * Instruksi UI seperti:
+  /*
+   * Instruksi UI.
    *
    * Pilih Diamond
-   * Pilih Nominal
+   * Pilih Robux
+   * Pilih Opal
    * Select Package
-   * Choose Product
    */
   if (
     /^(?:pilih|pilihkan|select|choose|silakan pilih|silahkan pilih|tentukan|masukkan|masukan|isi|klik)\b/i.test(
@@ -154,15 +333,11 @@ function looksLikeUiInstruction(value) {
     return true;
   }
 
-  /**
-   * Contoh:
-   *
-   * Pilih Diamond atau Membership Mingguan Free Fire
-   *
-   * Ini kategori pilihan, bukan SKU.
+  /*
+   * Pilih X atau Y.
    */
   if (
-    /\b(?:diamond(?:s)?|membership|pass|voucher|uc|vp)\b.{0,40}\batau\b.{0,40}\b(?:diamond(?:s)?|membership|pass|voucher|uc|vp)\b/i.test(
+    /\b(?:diamond(?:s)?|membership|pass|voucher|uc|vp|cp|robux|opal(?:s)?|token(?:s)?|starstone(?:s)?|crystal(?:s)?|origeometry)\b.{0,40}\batau\b.{0,40}\b(?:diamond(?:s)?|membership|pass|voucher|uc|vp|cp|robux|opal(?:s)?|token(?:s)?|starstone(?:s)?|crystal(?:s)?|origeometry)\b/i.test(
       text
     )
   ) {
@@ -170,7 +345,7 @@ function looksLikeUiInstruction(value) {
   }
 
   if (
-    /\b(?:choose|select)\b.{0,50}\b(?:diamond(?:s)?|membership|pass|voucher|uc|vp)\b/i.test(
+    /\b(?:choose|select)\b.{0,50}\b(?:diamond(?:s)?|membership|pass|voucher|uc|vp|cp|robux|opal(?:s)?|token(?:s)?|starstone(?:s)?|crystal(?:s)?|origeometry)\b/i.test(
       text
     )
   ) {
@@ -180,34 +355,54 @@ function looksLikeUiInstruction(value) {
   return false;
 }
 
-function looksLikeMarketingSentence(value) {
-  const text = String(value || '')
-    .replace(/\s+/g, ' ')
-    .trim();
+function looksLikeMarketingSentence(
+  value
+) {
+  const text =
+    String(
+      value ||
+      ''
+    )
+      .replace(
+        /\s+/g,
+        ' '
+      )
+      .trim();
 
   if (!text) {
     return false;
   }
 
-  if (looksLikeUiInstruction(text)) {
+  if (
+    looksLikeUiInstruction(
+      text
+    )
+  ) {
     return true;
   }
 
-  /**
-   * Contoh:
+  /*
+   * Copy promosi seperti:
    *
    * Paket 296 Diamond:
-   * Amankan stok Diamond-mu cuma dengan Rp74 ribuan.
-   *
-   * Itu marketing copy, bukan SKU.
+   * Amankan stok Diamond-mu cuma
+   * dengan Rp74 ribuan.
    */
-  if (isApproximatePriceText(text)) {
+  if (
+    isApproximatePriceText(
+      text
+    )
+  ) {
     return true;
   }
 
   if (
-    /^paket\b/i.test(text) &&
-    /:\s*/.test(text) &&
+    /^paket\b/i.test(
+      text
+    ) &&
+    /:\s*/.test(
+      text
+    ) &&
     /\b(?:amankan|dapatkan|nikmati|stok|cuma|hanya|hemat|promo|termurah)\b/i.test(
       text
     )
@@ -217,33 +412,43 @@ function looksLikeMarketingSentence(value) {
 
   const wordCount =
     text
-      .split(/\s+/)
-      .filter(Boolean)
+      .split(
+        /\s+/
+      )
+      .filter(
+        Boolean
+      )
       .length;
 
   const productAmountCount =
-    countProductAmounts(text);
+    countProductAmounts(
+      text
+    );
 
-  /**
-   * Jika satu kalimat menyebut banyak nominal:
-   *
-   * 425 diamonds, 475 diamonds dan 495 diamonds
-   *
-   * maka kemungkinan besar itu deskripsi.
+  /*
+   * Kalau satu teks menyebut
+   * beberapa nominal sekaligus,
+   * itu biasanya deskripsi.
    */
-  if (productAmountCount > 1) {
-    return true;
-  }
-
   if (
-    wordCount > 18 &&
-    productAmountCount >= 1
+    productAmountCount >
+    1
   ) {
     return true;
   }
 
   if (
-    wordCount >= 8 &&
+    wordCount >
+      18 &&
+    productAmountCount >=
+      1
+  ) {
+    return true;
+  }
+
+  if (
+    wordCount >=
+      8 &&
     /^(?:untuk\b|kamu\b|anda\b|dengan\b|jika\b|kalau\b|cukup\b|mulai\b|top\s*up\s+\d)/i.test(
       text
     )
@@ -252,7 +457,8 @@ function looksLikeMarketingSentence(value) {
   }
 
   if (
-    wordCount >= 10 &&
+    wordCount >=
+      10 &&
     /\b(?:kamu|anda)\s+(?:bisa|dapat|akan)\b/i.test(
       text
     )
@@ -261,8 +467,9 @@ function looksLikeMarketingSentence(value) {
   }
 
   if (
-    wordCount >= 10 &&
-    /\b(?:bisa|dapat|dapatkan|mendapatkan|nikmati)\b.{0,50}\b(?:diamond(?:s)?|uc|vp|point(?:s)?|crystal(?:s)?|cp)\b/i.test(
+    wordCount >=
+      10 &&
+    /\b(?:bisa|dapat|dapatkan|mendapatkan|nikmati)\b.{0,50}\b(?:diamond(?:s)?|uc|vp|cp|robux|opal(?:s)?|token(?:s)?|starstone(?:s)?|crystal(?:s)?|origeometry)\b/i.test(
       text
     )
   ) {
@@ -272,62 +479,93 @@ function looksLikeMarketingSentence(value) {
   return false;
 }
 
-function isNamedPackage(value) {
-  const text = String(value || '')
-    .replace(/\s+/g, ' ')
-    .trim();
+function isNamedPackage(
+  value
+) {
+  const text =
+    String(
+      value ||
+      ''
+    )
+      .replace(
+        /\s+/g,
+        ' '
+      )
+      .trim();
 
-  /**
-   * Paket tanpa nominal angka
-   * harus cocok sebagai satu nama SKU.
+  /*
+   * Paket tanpa nominal harus cocok
+   * secara ketat.
    */
-  return /^(?:(?:mobile legends(?::\s*bang bang)?|mobile legend|mobilelegends?|mobilelegend|mlbb|free fire|pubg mobile|genshin impact|valorant)\s*[-–—:]?\s*)?(?:weekly diamond pass(?:\s*[2-9]\s*x)?|weekly pass|monthly pass|membership mingguan|weekly membership|monthly membership|starlight(?: membership)?|starlight member(?: plus)?|twilight pass|welkin(?: moon)?|blessing(?: of the welkin moon)?|elite bundle|epic bundle|battle pass|coupon pass)(?:\s*[-–—:]?\s*(?:mobile legends(?::\s*bang bang)?|mobile legend|mobilelegends?|mobilelegend|mlbb|free fire|pubg mobile|genshin impact|valorant))?$/i.test(
+  return /^(?:(?:mobile legends(?::\s*bang bang)?|mobile legend|mobilelegends?|mobilelegend|mlbb|free fire|pubg mobile|genshin impact|valorant|crystal of atlan|honor of kings|call of duty(?::\s*)?mobile|cod mobile|codm|rf online next|ragnarok(?::\s*)?the new world|duet night abyss|roblox|neverness to everness|arknights(?::\s*)?endfield)\s*[-–—:]?\s*)?(?:weekly diamond pass(?:\s*[2-9]\s*x)?|weekly pass|weekly card plus|weekly card|monthly pass|membership mingguan|weekly membership|monthly membership|starlight(?: membership)?|starlight member(?: plus)?|twilight pass|welkin(?: moon)?|blessing(?: of the welkin moon)?|elite bundle|epic bundle|battle pass|honor pass|royale pass|coupon pass|kafra monthly)(?:\s*[-–—:]?\s*(?:mobile legends(?::\s*bang bang)?|mobile legend|mobilelegends?|mobilelegend|mlbb|free fire|pubg mobile|genshin impact|valorant|crystal of atlan|honor of kings|call of duty(?::\s*)?mobile|cod mobile|codm|rf online next|ragnarok(?::\s*)?the new world|duet night abyss|roblox|neverness to everness|arknights(?::\s*)?endfield))?$/i.test(
     text
   );
 }
 
-function hasNumericProduct(value) {
-  const text = String(value || '')
-    .replace(/\s+/g, ' ')
-    .trim();
+function hasNumericProduct(
+  value
+) {
+  const text =
+    String(
+      value ||
+      ''
+    )
+      .replace(
+        /\s+/g,
+        ' '
+      )
+      .trim();
 
-  const amountPattern = new RegExp(
-    `\\d[\\d.,]*(?:\\s*\\+\\s*\\d[\\d.,]*)?\\s*(?:bonus\\s*)?${PRODUCT_UNIT_PATTERN}\\b`,
-    'i'
+  const amountPattern =
+    new RegExp(
+      `\\d[\\d.,]*(?:\\s*\\+\\s*\\d[\\d.,]*)?\\s*(?:bonus\\s*)?${PRODUCT_UNIT_PATTERN}\\b`,
+      'i'
+    );
+
+  return amountPattern.test(
+    text
   );
-
-  return amountPattern.test(text);
 }
 
-function isProductName(line) {
-  const value = String(line || '')
-    .replace(/\s+/g, ' ')
-    .trim();
+function isProductName(
+  line
+) {
+  const value =
+    String(
+      line ||
+      ''
+    )
+      .replace(
+        /\s+/g,
+        ' '
+      )
+      .trim();
 
   if (
-    value.length < 2 ||
-    value.length > 160
+    value.length <
+      2 ||
+    value.length >
+      160
   ) {
     return false;
   }
 
-  /**
-   * Teks instruksi UI harus ditolak.
-   */
-  if (looksLikeUiInstruction(value)) {
+  if (
+    looksLikeUiInstruction(
+      value
+    )
+  ) {
     return false;
   }
 
-  /**
-   * Marketing copy / artikel harus ditolak.
-   */
-  if (looksLikeMarketingSentence(value)) {
+  if (
+    looksLikeMarketingSentence(
+      value
+    )
+  ) {
     return false;
   }
 
-  /**
-   * Label generik UI.
-   */
   if (
     /^(?:image:|dari$|best seller$|promo$|diskon$|pilih$|harga$|nominal$|deskripsi$|detail$|lihat semua$|pilih nominal$|pilih produk$|pilih diamond$)/i.test(
       value
@@ -336,8 +574,9 @@ function isProductName(line) {
     return false;
   }
 
-  /**
-   * Angka atau harga saja bukan SKU.
+  /*
+   * Angka atau harga saja
+   * bukan produk.
    */
   if (
     /^(?:rp\.?\s*)?\d[\d.,]*$/i.test(
@@ -347,32 +586,19 @@ function isProductName(line) {
     return false;
   }
 
-  /**
-   * Produk numerik.
-   *
-   * Contoh:
-   *
-   * 5 Diamonds
-   * 86 Diamonds
-   * 78 + 8 Diamonds
-   * 720 UC
-   * Mobile Legends 86 Diamonds
-   * 5 Diamond Termurah, Harga Rp 848
-   */
-  if (hasNumericProduct(value)) {
+  if (
+    hasNumericProduct(
+      value
+    )
+  ) {
     return true;
   }
 
-  /**
-   * Produk non-numerik.
-   *
-   * Contoh:
-   *
-   * Weekly Diamond Pass
-   * Starlight Membership
-   * Welkin Moon
-   */
-  if (isNamedPackage(value)) {
+  if (
+    isNamedPackage(
+      value
+    )
+  ) {
     return true;
   }
 
@@ -384,12 +610,7 @@ function extractOffersFromLines(
   options = {}
 ) {
   const {
-    /**
-     * Dibuat pendek agar harga
-     * tidak diambil dari card lain.
-     */
     maxDistance = 4,
-
     purchaseUrl,
     storeId,
     storeName,
@@ -401,100 +622,112 @@ function extractOffersFromLines(
 
   for (
     let index = 0;
-    index < lines.length;
+    index <
+    lines.length;
     index += 1
   ) {
-    const name = lines[index];
+    const name =
+      lines[
+        index
+      ];
 
-    if (!isProductName(name)) {
+    if (
+      !isProductName(
+        name
+      )
+    ) {
       continue;
     }
 
-    let price = null;
-    let priceLine = null;
+    let price =
+      null;
 
-    /**
-     * Paket non-numerik seperti:
+    let priceLine =
+      null;
+
+    /*
+     * Paket tanpa angka lebih rawan
+     * merupakan heading kategori.
      *
-     * Weekly Diamond Pass
-     *
-     * kadang hanya merupakan heading kategori.
-     *
-     * Karena itu harga hanya boleh:
-     *
-     * - ada pada line yang sama
-     * - atau tepat 1 line setelahnya
-     *
-     * Contoh yang harus ditolak:
-     *
-     * Weekly Diamond Pass
-     * Mobile Legends Cek Username
-     * Rp 83
-     *
-     * Rp83 bukan harga Weekly Diamond Pass.
+     * Karena itu hanya boleh mengambil
+     * harga maksimal 1 baris setelahnya.
      */
     const priceDistance =
-      isNamedPackage(name)
+      isNamedPackage(
+        name
+      )
         ? 1
         : maxDistance;
 
     for (
-      let cursor = index;
-      cursor <= Math.min(
-        index + priceDistance,
-        lines.length - 1
+      let cursor =
+        index;
+
+      cursor <=
+      Math.min(
+        index +
+          priceDistance,
+
+        lines.length -
+          1
       );
+
       cursor += 1
     ) {
-      const line = lines[cursor];
+      const line =
+        lines[
+          cursor
+        ];
 
-      /**
-       * Kalau sudah menemukan SKU berikutnya,
-       * hentikan pencarian harga.
+      /*
+       * Jangan mengambil harga
+       * produk berikutnya.
        */
       if (
-        cursor > index &&
-        isProductName(line)
+        cursor >
+          index &&
+        isProductName(
+          line
+        )
       ) {
         break;
       }
 
-      /**
-       * Lewati instruksi UI.
-       */
       if (
-        cursor > index &&
-        looksLikeUiInstruction(line)
+        cursor >
+          index &&
+        looksLikeUiInstruction(
+          line
+        )
       ) {
         continue;
       }
 
-      /**
-       * Lewati marketing copy.
-       */
       if (
-        cursor > index &&
-        looksLikeMarketingSentence(line)
+        cursor >
+          index &&
+        looksLikeMarketingSentence(
+          line
+        )
       ) {
         continue;
       }
 
-      /**
-       * Jangan jadikan:
-       *
-       * Rp74 ribuan
-       * Rp20rb
-       * Rp20k
-       *
-       * sebagai harga exact.
+      /*
+       * Harga seperti Rp74 ribuan
+       * tidak dianggap harga exact.
        */
-      if (isApproximatePriceText(line)) {
+      if (
+        isApproximatePriceText(
+          line
+        )
+      ) {
         continue;
       }
 
-      /**
-       * Harga HTML harus memiliki
-       * penanda Rupiah / IDR.
+      /*
+       * Harga HTML wajib mempunyai
+       * marker Rupiah / IDR.
        */
       if (
         /(?:\bIDR\b|\bRp\.?)/i.test(
@@ -502,14 +735,21 @@ function extractOffersFromLines(
         )
       ) {
         const parsed =
-          parseRupiah(line);
+          parseRupiah(
+            line
+          );
 
         if (
           parsed &&
-          parsed > 0
+          parsed >
+            0
         ) {
-          price = parsed;
-          priceLine = line;
+          price =
+            parsed;
+
+          priceLine =
+            line;
+
           break;
         }
       }
@@ -521,9 +761,7 @@ function extractOffersFromLines(
 
     offers.push({
       id:
-        `${storeId}-` +
-        `${gameId}-` +
-        `${offers.length + 1}`,
+        `${storeId}-${gameId}-${offers.length + 1}`,
 
       storeId,
       storeName,
@@ -548,25 +786,33 @@ function extractOffersFromLines(
       source,
 
       checkedAt:
-        new Date().toISOString()
+        new Date()
+          .toISOString()
     });
   }
 
-  return dedupeOffers(offers);
+  return dedupeOffers(
+    offers
+  );
 }
 
 function extractJsonScriptOffers(
   html,
   context
 ) {
-  const offers = [];
+  const offers =
+    [];
 
   const scripts = [
-    ...String(html || '').matchAll(
+    ...String(
+      html ||
+      ''
+    ).matchAll(
       /<script\b[^>]*>([\s\S]*?)<\/script>/gi
     )
   ].map(
-    (match) => match[1]
+    (match) =>
+      match[1]
   );
 
   const nameKeys = [
@@ -578,19 +824,14 @@ function extractJsonScriptOffers(
     'label'
   ];
 
-  /**
-   * "amount" sengaja tidak digunakan
-   * sebagai kandidat field harga.
+  /*
+   * Jangan tambahkan "amount".
    *
-   * Contoh:
+   * amount sering berarti:
    *
-   * {
-   *   name: "5 Diamonds",
-   *   amount: 5,
-   *   price: 1000
-   * }
+   * amount: 5
    *
-   * amount berarti jumlah diamond.
+   * = 5 Diamonds, bukan Rp5.
    */
   const priceKeys = [
     'price',
@@ -617,7 +858,8 @@ function extractJsonScriptOffers(
   ];
 
   for (
-    const script of scripts
+    const script of
+    scripts
   ) {
     if (
       !/(price|sellingPrice|productName|denomination)/i.test(
@@ -630,16 +872,20 @@ function extractJsonScriptOffers(
     const objectMatches =
       script.match(
         /\{[^{}]{0,900}\}/g
-      ) || [];
+      ) ||
+      [];
 
     for (
-      const objectText of objectMatches
+      const objectText of
+      objectMatches
     ) {
       let parsed;
 
       try {
         parsed =
-          JSON.parse(objectText);
+          JSON.parse(
+            objectText
+          );
       } catch {
         continue;
       }
@@ -647,21 +893,28 @@ function extractJsonScriptOffers(
       const nameKey =
         nameKeys.find(
           (key) =>
-            typeof parsed[key] ===
+            typeof parsed[
+              key
+            ] ===
             'string'
         );
 
       const priceKey =
         priceKeys.find(
           (key) =>
-            parsed[key] !== undefined
+            parsed[
+              key
+            ] !==
+            undefined
         );
 
       if (
         !nameKey ||
         !priceKey ||
         !isProductName(
-          parsed[nameKey]
+          parsed[
+            nameKey
+          ]
         )
       ) {
         continue;
@@ -669,21 +922,22 @@ function extractJsonScriptOffers(
 
       const price =
         parseRupiah(
-          parsed[priceKey]
+          parsed[
+            priceKey
+          ]
         );
 
       if (
         !price ||
-        price <= 0
+        price <=
+          0
       ) {
         continue;
       }
 
       offers.push({
         id:
-          `${context.storeId}-` +
-          `${context.gameId}-json-` +
-          `${offers.length + 1}`,
+          `${context.storeId}-${context.gameId}-json-${offers.length + 1}`,
 
         storeId:
           context.storeId,
@@ -695,7 +949,9 @@ function extractJsonScriptOffers(
           context.gameId,
 
         originalName:
-          parsed[nameKey],
+          parsed[
+            nameKey
+          ],
 
         productPrice:
           price,
@@ -715,16 +971,22 @@ function extractJsonScriptOffers(
           'live',
 
         checkedAt:
-          new Date().toISOString()
+          new Date()
+            .toISOString()
       });
     }
   }
 
-  return dedupeOffers(offers);
+  return dedupeOffers(
+    offers
+  );
 }
 
-function dedupeOffers(offers) {
-  const seen = new Set();
+function dedupeOffers(
+  offers
+) {
+  const seen =
+    new Set();
 
   return offers.filter(
     (offer) => {
@@ -733,14 +995,22 @@ function dedupeOffers(offers) {
           offer.originalName
         )
           .toLowerCase()
-          .replace(/\s+/g, ' ')}` +
-        `|${offer.productPrice}`;
+          .replace(
+            /\s+/g,
+            ' '
+          )}|${offer.productPrice}`;
 
-      if (seen.has(key)) {
+      if (
+        seen.has(
+          key
+        )
+      ) {
         return false;
       }
 
-      seen.add(key);
+      seen.add(
+        key
+      );
 
       return true;
     }
@@ -751,13 +1021,11 @@ module.exports = {
   decodeEntities,
   htmlToLines,
   sliceLines,
-
   countProductAmounts,
   isApproximatePriceText,
   looksLikeUiInstruction,
   looksLikeMarketingSentence,
   isNamedPackage,
-
   isProductName,
   extractOffersFromLines,
   extractJsonScriptOffers,
