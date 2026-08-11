@@ -218,17 +218,19 @@ function sliceLines(
 }
 
 /*
- * Unit produk yang bisa dibaca
+ * Unit produk yang dikenali
  * universal HTML parser.
  */
 const PRODUCT_UNIT_PATTERN =
   '(?:' +
   'lunar\\s+crystal(?:s)?|' +
   'genesis\\s+crystal(?:s)?|' +
+  'oneiric\\s+shard(?:s)?|' +
   'rift\\s*crystal(?:s)?|' +
   'riftcrystal(?:s)?|' +
   'origeometry|' +
   'starstone(?:s)?|' +
+  'monochrome|' +
   'opal(?:s)?|' +
   'robux|' +
   'diamond(?:s)?|' +
@@ -266,16 +268,6 @@ function countProductAmounts(
     : 0;
 }
 
-/*
- * Jangan gunakan harga seperti:
- *
- * Rp74 ribuan
- * Rp 20 ribu
- * Rp20rb
- * Rp20k
- *
- * sebagai harga exact.
- */
 function isApproximatePriceText(
   value
 ) {
@@ -317,14 +309,6 @@ function looksLikeUiInstruction(
     return false;
   }
 
-  /*
-   * Instruksi UI.
-   *
-   * Pilih Diamond
-   * Pilih Robux
-   * Pilih Opal
-   * Select Package
-   */
   if (
     /^(?:pilih|pilihkan|select|choose|silakan pilih|silahkan pilih|tentukan|masukkan|masukan|isi|klik)\b/i.test(
       text
@@ -333,11 +317,8 @@ function looksLikeUiInstruction(
     return true;
   }
 
-  /*
-   * Pilih X atau Y.
-   */
   if (
-    /\b(?:diamond(?:s)?|membership|pass|voucher|uc|vp|cp|robux|opal(?:s)?|token(?:s)?|starstone(?:s)?|crystal(?:s)?|origeometry)\b.{0,40}\batau\b.{0,40}\b(?:diamond(?:s)?|membership|pass|voucher|uc|vp|cp|robux|opal(?:s)?|token(?:s)?|starstone(?:s)?|crystal(?:s)?|origeometry)\b/i.test(
+    /\b(?:diamond(?:s)?|membership|pass|voucher|uc|vp|cp|robux|opal(?:s)?|token(?:s)?|starstone(?:s)?|crystal(?:s)?|oneiric\s+shard(?:s)?|monochrome|origeometry)\b.{0,40}\batau\b.{0,40}\b(?:diamond(?:s)?|membership|pass|voucher|uc|vp|cp|robux|opal(?:s)?|token(?:s)?|starstone(?:s)?|crystal(?:s)?|oneiric\s+shard(?:s)?|monochrome|origeometry)\b/i.test(
       text
     )
   ) {
@@ -345,7 +326,7 @@ function looksLikeUiInstruction(
   }
 
   if (
-    /\b(?:choose|select)\b.{0,50}\b(?:diamond(?:s)?|membership|pass|voucher|uc|vp|cp|robux|opal(?:s)?|token(?:s)?|starstone(?:s)?|crystal(?:s)?|origeometry)\b/i.test(
+    /\b(?:choose|select)\b.{0,50}\b(?:diamond(?:s)?|membership|pass|voucher|uc|vp|cp|robux|opal(?:s)?|token(?:s)?|starstone(?:s)?|crystal(?:s)?|oneiric\s+shard(?:s)?|monochrome|origeometry)\b/i.test(
       text
     )
   ) {
@@ -381,13 +362,6 @@ function looksLikeMarketingSentence(
     return true;
   }
 
-  /*
-   * Copy promosi seperti:
-   *
-   * Paket 296 Diamond:
-   * Amankan stok Diamond-mu cuma
-   * dengan Rp74 ribuan.
-   */
   if (
     isApproximatePriceText(
       text
@@ -425,11 +399,6 @@ function looksLikeMarketingSentence(
       text
     );
 
-  /*
-   * Kalau satu teks menyebut
-   * beberapa nominal sekaligus,
-   * itu biasanya deskripsi.
-   */
   if (
     productAmountCount >
     1
@@ -469,7 +438,7 @@ function looksLikeMarketingSentence(
   if (
     wordCount >=
       10 &&
-    /\b(?:bisa|dapat|dapatkan|mendapatkan|nikmati)\b.{0,50}\b(?:diamond(?:s)?|uc|vp|cp|robux|opal(?:s)?|token(?:s)?|starstone(?:s)?|crystal(?:s)?|origeometry)\b/i.test(
+    /\b(?:bisa|dapat|dapatkan|mendapatkan|nikmati)\b.{0,50}\b(?:diamond(?:s)?|uc|vp|cp|robux|opal(?:s)?|token(?:s)?|starstone(?:s)?|crystal(?:s)?|oneiric\s+shard(?:s)?|monochrome|origeometry)\b/i.test(
       text
     )
   ) {
@@ -493,11 +462,7 @@ function isNamedPackage(
       )
       .trim();
 
-  /*
-   * Paket tanpa nominal harus cocok
-   * secara ketat.
-   */
-  return /^(?:(?:mobile legends(?::\s*bang bang)?|mobile legend|mobilelegends?|mobilelegend|mlbb|free fire|pubg mobile|genshin impact|valorant|crystal of atlan|honor of kings|call of duty(?::\s*)?mobile|cod mobile|codm|rf online next|ragnarok(?::\s*)?the new world|duet night abyss|roblox|neverness to everness|arknights(?::\s*)?endfield)\s*[-–—:]?\s*)?(?:weekly diamond pass(?:\s*[2-9]\s*x)?|weekly pass|weekly card plus|weekly card|monthly pass|membership mingguan|weekly membership|monthly membership|starlight(?: membership)?|starlight member(?: plus)?|twilight pass|welkin(?: moon)?|blessing(?: of the welkin moon)?|elite bundle|epic bundle|battle pass|honor pass|royale pass|coupon pass|kafra monthly)(?:\s*[-–—:]?\s*(?:mobile legends(?::\s*bang bang)?|mobile legend|mobilelegends?|mobilelegend|mlbb|free fire|pubg mobile|genshin impact|valorant|crystal of atlan|honor of kings|call of duty(?::\s*)?mobile|cod mobile|codm|rf online next|ragnarok(?::\s*)?the new world|duet night abyss|roblox|neverness to everness|arknights(?::\s*)?endfield))?$/i.test(
+  return /^(?:(?:mobile legends(?::\s*bang bang)?|mobile legend|mobilelegends?|mobilelegend|mlbb|free fire|pubg mobile|genshin impact|valorant|crystal of atlan|honor of kings|call of duty(?::\s*)?mobile|cod mobile|codm|rf online next|ragnarok(?::\s*)?the new world|duet night abyss|roblox|neverness to everness|arknights(?::\s*)?endfield|zenless zone zero|honkai(?::\s*)?star rail|chaos zero nightmare)\s*[-–—:]?\s*)?(?:weekly diamond pass(?:\s*[2-9]\s*x)?|weekly pass|weekly card plus|weekly card|monthly pass|membership mingguan|weekly membership|monthly membership|starlight(?: membership)?|starlight member(?: plus)?|twilight pass|welkin(?: moon)?|blessing(?: of the welkin moon)?|elite bundle|epic bundle|battle pass|honor pass|royale pass|coupon pass|kafra monthly|express supply pass|inter[-\s]*knot membership|coronomicon monthly(?: package)?|special data|zero data)(?:\s*[-–—:]?\s*(?:mobile legends(?::\s*bang bang)?|mobile legend|mobilelegends?|mobilelegend|mlbb|free fire|pubg mobile|genshin impact|valorant|crystal of atlan|honor of kings|call of duty(?::\s*)?mobile|cod mobile|codm|rf online next|ragnarok(?::\s*)?the new world|duet night abyss|roblox|neverness to everness|arknights(?::\s*)?endfield|zenless zone zero|honkai(?::\s*)?star rail|chaos zero nightmare))?$/i.test(
     text
   );
 }
@@ -574,10 +539,6 @@ function isProductName(
     return false;
   }
 
-  /*
-   * Angka atau harga saja
-   * bukan produk.
-   */
   if (
     /^(?:rp\.?\s*)?\d[\d.,]*$/i.test(
       value
@@ -618,7 +579,8 @@ function extractOffersFromLines(
     source = 'live'
   } = options;
 
-  const offers = [];
+  const offers =
+    [];
 
   for (
     let index = 0;
@@ -646,11 +608,8 @@ function extractOffersFromLines(
       null;
 
     /*
-     * Paket tanpa angka lebih rawan
-     * merupakan heading kategori.
-     *
-     * Karena itu hanya boleh mengambil
-     * harga maksimal 1 baris setelahnya.
+     * Named package hanya boleh
+     * mencari harga satu baris ke depan.
      */
     const priceDistance =
       isNamedPackage(
@@ -679,10 +638,6 @@ function extractOffersFromLines(
           cursor
         ];
 
-      /*
-       * Jangan mengambil harga
-       * produk berikutnya.
-       */
       if (
         cursor >
           index &&
@@ -713,10 +668,6 @@ function extractOffersFromLines(
         continue;
       }
 
-      /*
-       * Harga seperti Rp74 ribuan
-       * tidak dianggap harga exact.
-       */
       if (
         isApproximatePriceText(
           line
@@ -725,10 +676,6 @@ function extractOffersFromLines(
         continue;
       }
 
-      /*
-       * Harga HTML wajib mempunyai
-       * marker Rupiah / IDR.
-       */
       if (
         /(?:\bIDR\b|\bRp\.?)/i.test(
           line
@@ -825,13 +772,8 @@ function extractJsonScriptOffers(
   ];
 
   /*
-   * Jangan tambahkan "amount".
-   *
-   * amount sering berarti:
-   *
-   * amount: 5
-   *
-   * = 5 Diamonds, bukan Rp5.
+   * amount sengaja tidak
+   * dijadikan kandidat harga.
    */
   const priceKeys = [
     'price',
