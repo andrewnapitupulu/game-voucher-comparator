@@ -239,6 +239,26 @@ const GAMES = [
       'special data',
       'zero data'
     ]
+  },
+
+  /*
+   * WUTHERING WAVES
+   */
+  {
+    id: 'wuthering-waves',
+    name: 'Wuthering Waves',
+    publisher: 'Kuro Games',
+    icon: 'WW',
+    aliases: [
+      'wuthering waves',
+      'wuthering wave',
+      'wuthering',
+      'wuwa',
+      'ww',
+      'lunite',
+      'lunites',
+      'lunite subscription'
+    ]
   }
 ];
 
@@ -1598,6 +1618,13 @@ function getPackageFilterMeta(
         unit =
           'Monochrome';
       } else if (
+        /\blunite(?:s)?\b/i.test(
+          sample
+        )
+      ) {
+        unit =
+          'Lunites';
+      } else if (
         /\bopal(?:s)?\b/i.test(
           sample
         )
@@ -1701,6 +1728,9 @@ function getPackageFilterMeta(
 
       Monochrome:
         'Monochrome',
+
+      Lunites:
+        'Lunites',
 
       Opals:
         'Opals',
@@ -1868,6 +1898,16 @@ function getPackageFilterMeta(
         'Zero Data',
       order:
         150
+    },
+
+    /*
+     * Wuthering Waves
+     */
+    'lunite-subscription': {
+      label:
+        'Lunite Subscription',
+      order:
+        160
     },
 
     other: {
