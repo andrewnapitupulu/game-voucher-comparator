@@ -87,9 +87,6 @@ const SPECIAL_TYPES = [
       'Monthly Pass'
   },
 
-  /*
-   * Honkai: Star Rail
-   */
   {
     type:
       'express-supply-pass',
@@ -101,9 +98,6 @@ const SPECIAL_TYPES = [
       'Express Supply Pass'
   },
 
-  /*
-   * Zenless Zone Zero
-   */
   {
     type:
       'inter-knot-membership',
@@ -115,9 +109,6 @@ const SPECIAL_TYPES = [
       'Inter-Knot Membership'
   },
 
-  /*
-   * Chaos Zero Nightmare
-   */
   {
     type:
       'coronomicon-monthly',
@@ -151,6 +142,20 @@ const SPECIAL_TYPES = [
       'Zero Data'
   },
 
+  /*
+   * Wuthering Waves
+   */
+  {
+    type:
+      'lunite-subscription',
+
+    pattern:
+      /lunite\s+subscription/i,
+
+    label:
+      'Lunite Subscription'
+  },
+
   {
     type: 'membership',
     pattern:
@@ -177,9 +182,6 @@ const UNIT_PATTERNS = [
       /genesis\s+crystal(?:s)?/i
   },
 
-  /*
-   * Honkai: Star Rail
-   */
   {
     unit:
       'Oneiric Shards',
@@ -212,15 +214,23 @@ const UNIT_PATTERNS = [
       /starstone(?:s)?/i
   },
 
-  /*
-   * Zenless Zone Zero
-   */
   {
     unit:
       'Monochrome',
 
     pattern:
       /monochrome/i
+  },
+
+  /*
+   * Wuthering Waves
+   */
+  {
+    unit:
+      'Lunites',
+
+    pattern:
+      /lunite(?:s)?/i
   },
 
   {
@@ -271,14 +281,6 @@ const UNIT_PATTERNS = [
       /\bvp\b|valorant\s+points?/i
   },
 
-  /*
-   * Generic Crystals.
-   *
-   * Diletakkan setelah Lunar,
-   * Genesis, Oneiric, Rift, dll
-   * supaya unit yang lebih spesifik
-   * diprioritaskan.
-   */
   {
     unit:
       'Crystals',
@@ -329,6 +331,7 @@ const DIRECT_UNIT_PATTERN = [
   'origeometry',
   'starstone(?:s)?',
   'monochrome',
+  'lunite(?:s)?',
   'opal(?:s)?',
   'robux',
   'diamond(?:s)?',
@@ -343,9 +346,7 @@ const DIRECT_UNIT_PATTERN = [
   'voucher(?:s)?'
 ].join('|');
 
-function parseMultiplier(
-  name
-) {
+function parseMultiplier(name) {
   const match =
     String(name)
       .match(
@@ -362,9 +363,7 @@ function parseMultiplier(
     : 1;
 }
 
-function parseAmounts(
-  name
-) {
+function parseAmounts(name) {
   const value =
     String(
       name ||
@@ -472,9 +471,7 @@ function parseAmounts(
   };
 }
 
-function detectUnit(
-  name
-) {
+function detectUnit(name) {
   return (
     UNIT_PATTERNS.find(
       (entry) =>
