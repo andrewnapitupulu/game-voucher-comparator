@@ -1112,10 +1112,6 @@ function validatePageForGame(
       100;
   }
 
-  /*
-   * Jika title/H1 jelas merupakan
-   * game lain, candidate ditolak.
-   */
   if (
     competingTitle &&
     !titleMatches.length &&
@@ -1136,9 +1132,6 @@ function validatePageForGame(
     };
   }
 
-  /*
-   * Soft 404 / redirect ke homepage.
-   */
   if (
     homepageLikeUrl(
       finalUrl,
@@ -1255,9 +1248,6 @@ function namedPackageMatchesGame(
       name
     );
 
-  /*
-   * Genshin
-   */
   if (
     /\bwelkin\b|blessing of the welkin moon/.test(
       text
@@ -1269,9 +1259,6 @@ function namedPackageMatchesGame(
     );
   }
 
-  /*
-   * Mobile Legends
-   */
   if (
     /weekly diamond pass|\bwdp\b|starlight|twilight pass/.test(
       text
@@ -1283,9 +1270,6 @@ function namedPackageMatchesGame(
     );
   }
 
-  /*
-   * PUBG
-   */
   if (
     /royale pass/.test(
       text
@@ -1297,9 +1281,6 @@ function namedPackageMatchesGame(
     );
   }
 
-  /*
-   * Honor of Kings
-   */
   if (
     /honor pass/.test(
       text
@@ -1311,9 +1292,6 @@ function namedPackageMatchesGame(
     );
   }
 
-  /*
-   * Honkai: Star Rail
-   */
   if (
     /express supply pass/.test(
       text
@@ -1325,9 +1303,6 @@ function namedPackageMatchesGame(
     );
   }
 
-  /*
-   * Zenless Zone Zero
-   */
   if (
     /inter knot membership/.test(
       text
@@ -1339,9 +1314,6 @@ function namedPackageMatchesGame(
     );
   }
 
-  /*
-   * Chaos Zero Nightmare
-   */
   if (
     /coronomicon monthly(?: package)?|^special data$|^zero data$/.test(
       text
@@ -1354,11 +1326,23 @@ function namedPackageMatchesGame(
   }
 
   /*
-   * Paket generik tetap boleh
-   * diterima apabila page sudah
-   * tervalidasi sebagai game target.
+   * Wuthering Waves
+   *
+   * $5 akan menjadi angka biasa
+   * setelah normalizeText().
    */
-  return /\b(?:weekly|monthly|membership|member|battle pass|coupon pass|elite bundle|epic bundle|card)\b/.test(
+  if (
+    /lunite subscription/.test(
+      text
+    )
+  ) {
+    return (
+      game.id ===
+      'wuthering-waves'
+    );
+  }
+
+  return /\b(?:weekly|monthly|membership|member|subscription|battle pass|coupon pass|elite bundle|epic bundle|card)\b/.test(
     text
   );
 }
@@ -1378,10 +1362,6 @@ function offerMatchesGame(
     return false;
   }
 
-  /*
-   * Nama produk secara eksplisit
-   * menyebut target game.
-   */
   if (
     containsExplicitGameName(
       name,
@@ -1391,10 +1371,6 @@ function offerMatchesGame(
     return true;
   }
 
-  /*
-   * Nama produk secara eksplisit
-   * menyebut game lain.
-   */
   if (
     containsOtherGameName(
       name,
@@ -1410,10 +1386,6 @@ function offerMatchesGame(
       []
     );
 
-  /*
-   * Currency produk harus sesuai
-   * currency game target.
-   */
   if (
     unitAliases.some(
       (unit) =>
@@ -1426,9 +1398,6 @@ function offerMatchesGame(
     return true;
   }
 
-  /*
-   * Named package.
-   */
   if (
     namedPackageMatchesGame(
       name,
@@ -1476,10 +1445,6 @@ function parseOffers(
       {
         ...context,
 
-        /*
-         * Jangan diperbesar kembali
-         * menjadi 8.
-         */
         maxDistance:
           4
       }
@@ -1619,11 +1584,6 @@ function createUniversalAdapter(
             page.finalUrl ||
             url;
 
-          /*
-           * Candidate page HARUS
-           * tervalidasi sebelum
-           * produknya diparsing.
-           */
           const validation =
             validatePageForGame(
               page.text,
