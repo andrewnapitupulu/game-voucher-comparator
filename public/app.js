@@ -191,6 +191,54 @@ const GAMES = [
       'enfield',
       'origeometry'
     ]
+  },
+
+  {
+    id: 'zenless-zone-zero',
+    name: 'Zenless Zone Zero',
+    publisher: 'HoYoverse',
+    icon: 'ZZ',
+    aliases: [
+      'zenless zone zero',
+      'zenless',
+      'zzz',
+      'zenless zone',
+      'monochrome',
+      'inter knot membership',
+      'inter-knot membership'
+    ]
+  },
+
+  {
+    id: 'honkai-star-rail',
+    name: 'Honkai: Star Rail',
+    publisher: 'HoYoverse',
+    icon: 'HS',
+    aliases: [
+      'honkai star rail',
+      'honkai: star rail',
+      'star rail',
+      'hsr',
+      'oneiric shard',
+      'oneiric shards',
+      'express supply pass'
+    ]
+  },
+
+  {
+    id: 'chaos-zero-nightmare',
+    name: 'Chaos Zero Nightmare',
+    publisher: 'Smilegate',
+    icon: 'CZ',
+    aliases: [
+      'chaos zero nightmare',
+      'chaos zero',
+      'czn',
+      'chaos nightmare',
+      'coronomicon monthly package',
+      'special data',
+      'zero data'
+    ]
   }
 ];
 
@@ -430,23 +478,27 @@ function relativeTime(
     return `${seconds} detik lalu`;
   }
 
-  const minutes =
-    Math.floor(
-      seconds /
-      60
-    );
-
-  return `${minutes} menit lalu`;
+  return `${Math.floor(
+    seconds /
+    60
+  )} menit lalu`;
 }
 
 function initials(
   name
 ) {
   const known = {
-    codashop: 'C',
-    unipin: 'U',
-    lapakgaming: 'L',
-    duniagames: 'DG'
+    codashop:
+      'C',
+
+    unipin:
+      'U',
+
+    lapakgaming:
+      'L',
+
+    duniagames:
+      'DG'
   };
 
   const key =
@@ -879,6 +931,7 @@ async function fetchBatch(
   const response =
     await fetch(
       `/api/search?q=${encodeURIComponent(query)}&offset=${offset}&limit=${limit}&_=${Date.now()}`,
+
       {
         method:
           'GET',
@@ -923,6 +976,7 @@ async function search(
 
   if (!cleanQuery) {
     elements.input.focus();
+
     return;
   }
 
@@ -1424,27 +1478,21 @@ function populateStoreFilter(
           id,
           name
         ]
-      ) => {
+      ) =>
         elements.storeFilter.add(
           new Option(
             name,
             id
           )
-        );
-      }
+        )
     );
 
-  if (
-    [...stores.keys()].includes(
+  elements.storeFilter.value =
+    stores.has(
       current
     )
-  ) {
-    elements.storeFilter.value =
-      current;
-  } else {
-    elements.storeFilter.value =
-      'all';
-  }
+      ? current
+      : 'all';
 }
 
 function normalizeFilterKey(
@@ -1515,6 +1563,13 @@ function getPackageFilterMeta(
         unit =
           'Genesis Crystals';
       } else if (
+        /oneiric\s+shard(?:s)?/i.test(
+          sample
+        )
+      ) {
+        unit =
+          'Oneiric Shards';
+      } else if (
         /rift\s*crystal(?:s)?|riftcrystal(?:s)?/i.test(
           sample
         )
@@ -1535,6 +1590,13 @@ function getPackageFilterMeta(
       ) {
         unit =
           'Starstones';
+      } else if (
+        /\bmonochrome\b/i.test(
+          sample
+        )
+      ) {
+        unit =
+          'Monochrome';
       } else if (
         /\bopal(?:s)?\b/i.test(
           sample
@@ -1625,6 +1687,9 @@ function getPackageFilterMeta(
       'Genesis Crystals':
         'Genesis Crystals',
 
+      'Oneiric Shards':
+        'Oneiric Shards',
+
       Riftcrystals:
         'Riftcrystals',
 
@@ -1633,6 +1698,9 @@ function getPackageFilterMeta(
 
       Starstones:
         'Starstones',
+
+      Monochrome:
+        'Monochrome',
 
       Opals:
         'Opals',
@@ -1767,6 +1835,41 @@ function getPackageFilterMeta(
         100
     },
 
+    'express-supply-pass': {
+      label:
+        'Express Supply Pass',
+      order:
+        110
+    },
+
+    'inter-knot-membership': {
+      label:
+        'Inter-Knot Membership',
+      order:
+        120
+    },
+
+    'coronomicon-monthly': {
+      label:
+        'Coronomicon Monthly Package',
+      order:
+        130
+    },
+
+    'special-data': {
+      label:
+        'Special Data',
+      order:
+        140
+    },
+
+    'zero-data': {
+      label:
+        'Zero Data',
+      order:
+        150
+    },
+
     other: {
       label:
         'Lainnya',
@@ -1862,10 +1965,6 @@ function populateTypeFilter(
           )
       );
 
-  /*
-   * Selalu reset opsi dari hasil
-   * pencarian sebelumnya.
-   */
   elements.typeFilter.replaceChildren(
     new Option(
       'Semua paket',
@@ -1885,19 +1984,14 @@ function populateTypeFilter(
     );
   }
 
-  if (
+  elements.typeFilter.value =
     current ===
       'all' ||
     filters.has(
       current
     )
-  ) {
-    elements.typeFilter.value =
-      current;
-  } else {
-    elements.typeFilter.value =
-      'all';
-  }
+      ? current
+      : 'all';
 }
 
 function getVisibleGroups() {
@@ -1917,7 +2011,7 @@ function getVisibleGroups() {
   const sort =
     elements.sortSelect.value;
 
-  let groups =
+  const groups =
     data.groups
 
       .map(
@@ -2173,7 +2267,6 @@ function renderPackages() {
 
       liveBadge.classList.toggle(
         'fallback',
-
         !group.hasLivePrice
       );
 
@@ -2204,7 +2297,6 @@ function renderPackages() {
           rows.append(
             renderOfferRow(
               offer,
-
               offerIndex ===
               0
             )
