@@ -14,6 +14,7 @@ const GAMES = [
       'mole'
     ]
   },
+
   {
     id: 'free-fire',
     name: 'Free Fire',
@@ -25,6 +26,7 @@ const GAMES = [
       'ff'
     ]
   },
+
   {
     id: 'pubg-mobile',
     name: 'PUBG Mobile',
@@ -37,6 +39,7 @@ const GAMES = [
       'uc'
     ]
   },
+
   {
     id: 'genshin-impact',
     name: 'Genshin Impact',
@@ -49,6 +52,7 @@ const GAMES = [
       'welkin'
     ]
   },
+
   {
     id: 'valorant',
     name: 'VALORANT',
@@ -59,163 +63,385 @@ const GAMES = [
       'valo',
       'vp'
     ]
+  },
+
+  {
+    id: 'crystal-of-atlan',
+    name: 'Crystal of Atlan',
+    publisher: 'Nuverse',
+    icon: 'CA',
+    aliases: [
+      'crystal of atlan',
+      'crystal atlan',
+      'coa',
+      'atlan',
+      'opal'
+    ]
+  },
+
+  {
+    id: 'honor-of-kings',
+    name: 'Honor of Kings',
+    publisher:
+      'TiMi Studio Group / Level Infinite',
+    icon: 'HK',
+    aliases: [
+      'honor of kings',
+      'honour of kings',
+      'hok',
+      'hok global'
+    ]
+  },
+
+  {
+    id: 'call-of-duty-mobile',
+    name: 'Call of Duty: Mobile',
+    publisher: 'Activision',
+    icon: 'CM',
+    aliases: [
+      'call of duty mobile',
+      'call of duty: mobile',
+      'cod mobile',
+      'codm',
+      'codm cp'
+    ]
+  },
+
+  {
+    id: 'rf-online-next',
+    name: 'RF ONLINE NEXT',
+    publisher: 'Netmarble',
+    icon: 'RF',
+    aliases: [
+      'rf online next',
+      'rf next',
+      'rfonline next',
+      'rfon'
+    ]
+  },
+
+  {
+    id: 'ragnarok-the-new-world',
+    name: 'Ragnarok: The New World',
+    publisher: 'GRAVITY',
+    icon: 'RN',
+    aliases: [
+      'ragnarok the new world',
+      'ragnarok: the new world',
+      'ragnarok new world',
+      'ro new world',
+      'rtnw'
+    ]
+  },
+
+  {
+    id: 'duet-night-abyss',
+    name: 'Duet Night Abyss',
+    publisher: 'Pan Studio',
+    icon: 'DN',
+    aliases: [
+      'duet night abyss',
+      'dna',
+      'duet abyss',
+      'duet night'
+    ]
+  },
+
+  {
+    id: 'roblox',
+    name: 'Roblox',
+    publisher: 'Roblox Corporation',
+    icon: 'RB',
+    aliases: [
+      'roblox',
+      'robux',
+      'roblox robux',
+      'roblox gift card'
+    ]
+  },
+
+  {
+    id: 'neverness-to-everness',
+    name: 'Neverness to Everness',
+    publisher:
+      'Hotta Studio / Perfect World Games',
+    icon: 'NE',
+    aliases: [
+      'neverness to everness',
+      'nte',
+      'n2e',
+      'neverness everness',
+      'riftcrystal',
+      'riftcrystals'
+    ]
+  },
+
+  {
+    id: 'arknights-endfield',
+    name: 'Arknights: Endfield',
+    publisher:
+      'Hypergryph / Gryphline',
+    icon: 'AE',
+    aliases: [
+      'arknights endfield',
+      'arknights: endfield',
+      'endfield',
+      'arknights enfield',
+      'arknights: enfield',
+      'enfield',
+      'origeometry'
+    ]
   }
 ];
 
 const elements = {
   form:
-    document.querySelector('#searchForm'),
+    document.querySelector(
+      '#searchForm'
+    ),
 
   input:
-    document.querySelector('#searchInput'),
+    document.querySelector(
+      '#searchInput'
+    ),
 
   searchButton:
-    document.querySelector('#searchButton'),
+    document.querySelector(
+      '#searchButton'
+    ),
 
   suggestions:
-    document.querySelector('#suggestions'),
+    document.querySelector(
+      '#suggestions'
+    ),
 
   initial:
-    document.querySelector('#initialState'),
+    document.querySelector(
+      '#initialState'
+    ),
 
   loading:
-    document.querySelector('#loadingState'),
+    document.querySelector(
+      '#loadingState'
+    ),
 
   error:
-    document.querySelector('#errorState'),
+    document.querySelector(
+      '#errorState'
+    ),
 
   results:
-    document.querySelector('#resultsState'),
+    document.querySelector(
+      '#resultsState'
+    ),
 
   errorTitle:
-    document.querySelector('#errorTitle'),
+    document.querySelector(
+      '#errorTitle'
+    ),
 
   errorMessage:
-    document.querySelector('#errorMessage'),
+    document.querySelector(
+      '#errorMessage'
+    ),
 
   retryButton:
-    document.querySelector('#retryButton'),
+    document.querySelector(
+      '#retryButton'
+    ),
 
   refreshButton:
-    document.querySelector('#refreshButton'),
+    document.querySelector(
+      '#refreshButton'
+    ),
 
   themeButton:
-    document.querySelector('#themeButton'),
+    document.querySelector(
+      '#themeButton'
+    ),
 
   gameIcon:
-    document.querySelector('#gameIcon'),
+    document.querySelector(
+      '#gameIcon'
+    ),
 
   gameName:
-    document.querySelector('#gameName'),
+    document.querySelector(
+      '#gameName'
+    ),
 
   packageCount:
-    document.querySelector('#packageCount'),
+    document.querySelector(
+      '#packageCount'
+    ),
 
   storeCount:
-    document.querySelector('#storeCount'),
+    document.querySelector(
+      '#storeCount'
+    ),
 
   checkedTime:
-    document.querySelector('#checkedTime'),
+    document.querySelector(
+      '#checkedTime'
+    ),
 
   startingPrice:
-    document.querySelector('#startingPrice'),
+    document.querySelector(
+      '#startingPrice'
+    ),
 
   duration:
-    document.querySelector('#duration'),
+    document.querySelector(
+      '#duration'
+    ),
 
   fallbackNotice:
-    document.querySelector('#fallbackNotice'),
+    document.querySelector(
+      '#fallbackNotice'
+    ),
 
   providerStatuses:
-    document.querySelector('#providerStatuses'),
+    document.querySelector(
+      '#providerStatuses'
+    ),
 
   toggleProviders:
-    document.querySelector('#toggleProviders'),
+    document.querySelector(
+      '#toggleProviders'
+    ),
 
   typeFilter:
-    document.querySelector('#typeFilter'),
+    document.querySelector(
+      '#typeFilter'
+    ),
 
   storeFilter:
-    document.querySelector('#storeFilter'),
+    document.querySelector(
+      '#storeFilter'
+    ),
 
   sortSelect:
-    document.querySelector('#sortSelect'),
+    document.querySelector(
+      '#sortSelect'
+    ),
 
   packageList:
-    document.querySelector('#packageList'),
+    document.querySelector(
+      '#packageList'
+    ),
 
   visibleCount:
-    document.querySelector('#visibleCount'),
+    document.querySelector(
+      '#visibleCount'
+    ),
 
   emptyFilter:
-    document.querySelector('#emptyFilterState'),
+    document.querySelector(
+      '#emptyFilterState'
+    ),
 
   resultNotice:
-    document.querySelector('#resultNotice'),
+    document.querySelector(
+      '#resultNotice'
+    ),
 
   searchProgress:
-    document.querySelector('#searchProgress'),
+    document.querySelector(
+      '#searchProgress'
+    ),
 
   progressText:
-    document.querySelector('#progressText'),
+    document.querySelector(
+      '#progressText'
+    ),
 
   progressFill:
-    document.querySelector('#progressFill'),
+    document.querySelector(
+      '#progressFill'
+    ),
 
   template:
-    document.querySelector('#packageTemplate')
+    document.querySelector(
+      '#packageTemplate'
+    )
 };
 
 const state = {
   query: '',
   response: null,
-  providerPanelVisible: true,
+  providerPanelVisible:
+    true,
   controller: null,
   searchStartedAt: 0
 };
 
-function rupiah(value) {
+function rupiah(
+  value
+) {
   return new Intl.NumberFormat(
     'id-ID',
     {
-      style: 'currency',
-      currency: 'IDR',
-      maximumFractionDigits: 0
+      style:
+        'currency',
+
+      currency:
+        'IDR',
+
+      maximumFractionDigits:
+        0
     }
   ).format(
-    Number(value || 0)
+    Number(
+      value ||
+      0
+    )
   );
 }
 
-function relativeTime(iso) {
+function relativeTime(
+  iso
+) {
   const seconds =
     Math.max(
       0,
+
       Math.floor(
         (
           Date.now() -
-          new Date(iso).getTime()
-        ) / 1000
+          new Date(
+            iso
+          ).getTime()
+        ) /
+          1000
       )
     );
 
-  if (seconds < 8) {
+  if (
+    seconds <
+    8
+  ) {
     return 'baru saja';
   }
 
-  if (seconds < 60) {
+  if (
+    seconds <
+    60
+  ) {
     return `${seconds} detik lalu`;
   }
 
   const minutes =
     Math.floor(
-      seconds / 60
+      seconds /
+      60
     );
 
   return `${minutes} menit lalu`;
 }
 
-function initials(name) {
+function initials(
+  name
+) {
   const known = {
     codashop: 'C',
     unipin: 'U',
@@ -224,44 +450,77 @@ function initials(name) {
   };
 
   const key =
-    String(name || '')
+    String(
+      name ||
+      ''
+    )
       .toLowerCase()
-      .replace(/\s+/g, '');
+      .replace(
+        /\s+/g,
+        ''
+      );
 
-  if (known[key]) {
-    return known[key];
+  if (
+    known[
+      key
+    ]
+  ) {
+    return known[
+      key
+    ];
   }
 
-  return String(name || '?')
-    .split(/\s+/)
-    .map(
-      (part) => part[0]
+  return String(
+    name ||
+    '?'
+  )
+    .split(
+      /\s+/
     )
-    .join('')
-    .slice(0, 2)
+    .map(
+      (part) =>
+        part[0]
+    )
+    .join(
+      ''
+    )
+    .slice(
+      0,
+      2
+    )
     .toUpperCase();
 }
 
-function showView(view) {
+function showView(
+  view
+) {
   elements.initial.hidden =
-    view !== 'initial';
+    view !==
+    'initial';
 
   elements.loading.hidden =
-    view !== 'loading';
+    view !==
+    'loading';
 
   elements.error.hidden =
-    view !== 'error';
+    view !==
+    'error';
 
   elements.results.hidden =
-    view !== 'results';
+    view !==
+    'results';
 }
 
-function setSearching(searching) {
+function setSearching(
+  searching
+) {
   elements.searchButton.disabled =
     searching;
 
   elements.searchButton
-    .querySelector('span')
+    .querySelector(
+      'span'
+    )
     .textContent =
       searching
         ? 'Mencari...'
@@ -278,14 +537,21 @@ function showError(
   elements.errorMessage.textContent =
     message;
 
-  showView('error');
+  showView(
+    'error'
+  );
 }
 
-function recomputeGroup(group) {
+function recomputeGroup(
+  group
+) {
   const offers =
     [...group.offers]
       .sort(
-        (a, b) =>
+        (
+          a,
+          b
+        ) =>
           a.finalPrice -
             b.finalPrice ||
           a.storeName.localeCompare(
@@ -299,7 +565,8 @@ function recomputeGroup(group) {
 
   const highest =
     offers[
-      offers.length - 1
+      offers.length -
+      1
     ];
 
   return {
@@ -308,18 +575,23 @@ function recomputeGroup(group) {
     offers,
 
     cheapestPrice:
-      cheapest?.finalPrice || 0,
+      cheapest?.finalPrice ||
+      0,
 
     cheapestStore:
-      cheapest?.storeName || '—',
+      cheapest?.storeName ||
+      '—',
 
     highestPrice:
-      highest?.finalPrice || 0,
+      highest?.finalPrice ||
+      0,
 
     savings:
-      cheapest && highest
+      cheapest &&
+      highest
         ? Math.max(
             0,
+
             highest.finalPrice -
               cheapest.finalPrice
           )
@@ -336,7 +608,8 @@ function recomputeGroup(group) {
     hasLivePrice:
       offers.some(
         (offer) =>
-          offer.source === 'live'
+          offer.source ===
+          'live'
       )
   };
 }
@@ -346,14 +619,24 @@ function mergeBatch(
   batch
 ) {
   const aggregate =
-    current || {
+    current ||
+    {
       ...batch,
 
-      providerStatus: [],
-      groups: [],
-      checkedStoreCount: 0,
-      durationMs: 0,
-      fallbackUsed: false
+      providerStatus:
+        [],
+
+      groups:
+        [],
+
+      checkedStoreCount:
+        0,
+
+      durationMs:
+        0,
+
+      fallbackUsed:
+        false
     };
 
   aggregate.game =
@@ -411,8 +694,10 @@ function mergeBatch(
       aggregate.groups.map(
         (group) => [
           group.id,
+
           {
             ...group,
+
             offers: [
               ...group.offers
             ]
@@ -428,7 +713,8 @@ function mergeBatch(
     const target =
       groupMap.get(
         incoming.id
-      ) || {
+      ) ||
+      {
         ...incoming,
         offers: []
       };
@@ -448,12 +734,18 @@ function mergeBatch(
       const key =
         `${offer.storeId}|${offer.originalName}|${offer.finalPrice}`;
 
-      if (!seen.has(key)) {
+      if (
+        !seen.has(
+          key
+        )
+      ) {
         target.offers.push(
           offer
         );
 
-        seen.add(key);
+        seen.add(
+          key
+        );
       }
     }
 
@@ -468,7 +760,10 @@ function mergeBatch(
   aggregate.groups =
     [...groupMap.values()]
       .sort(
-        (a, b) =>
+        (
+          a,
+          b
+        ) =>
           a.cheapestPrice -
             b.cheapestPrice ||
           a.name.localeCompare(
@@ -486,21 +781,29 @@ function mergeBatch(
 
   aggregate.offerCount =
     aggregate.groups.reduce(
-      (sum, group) =>
+      (
+        sum,
+        group
+      ) =>
         sum +
         group.offers.length,
+
       0
     );
 
   aggregate.liveOfferCount =
     aggregate.groups.reduce(
-      (sum, group) =>
+      (
+        sum,
+        group
+      ) =>
         sum +
         group.offers.filter(
           (offer) =>
             offer.source ===
             'live'
         ).length,
+
       0
     );
 
@@ -530,6 +833,7 @@ function updateSearchProgress(
     Math.min(
       data.checkedStoreCount ||
         0,
+
       data.totalStoreCount ||
         99
     );
@@ -543,7 +847,8 @@ function updateSearchProgress(
       (
         checked /
         total
-      ) * 100
+      ) *
+        100
     );
 
   elements.searchProgress.hidden =
@@ -557,10 +862,12 @@ function updateSearchProgress(
   elements.progressFill.style.width =
     `${percent}%`;
 
-  elements.searchProgress.classList.toggle(
-    'complete',
-    complete
-  );
+  elements.searchProgress
+    .classList
+    .toggle(
+      'complete',
+      complete
+    );
 }
 
 async function fetchBatch(
@@ -573,7 +880,8 @@ async function fetchBatch(
     await fetch(
       `/api/search?q=${encodeURIComponent(query)}&offset=${offset}&limit=${limit}&_=${Date.now()}`,
       {
-        method: 'GET',
+        method:
+          'GET',
 
         cache:
           'no-store',
@@ -596,16 +904,21 @@ async function fetchBatch(
   ) {
     throw new Error(
       payload.message ||
-        'Harga tidak dapat ditemukan.'
+      'Harga tidak dapat ditemukan.'
     );
   }
 
   return payload;
 }
 
-async function search(query) {
+async function search(
+  query
+) {
   const cleanQuery =
-    String(query || '')
+    String(
+      query ||
+      ''
+    )
       .trim();
 
   if (!cleanQuery) {
@@ -613,7 +926,9 @@ async function search(query) {
     return;
   }
 
-  if (state.controller) {
+  if (
+    state.controller
+  ) {
     state.controller.abort();
   }
 
@@ -640,12 +955,16 @@ async function search(query) {
 
   elements.searchProgress
     .classList
-    .remove('complete');
+    .remove(
+      'complete'
+    );
 
   elements.progressFill.style.width =
     '0%';
 
-  setSearching(true);
+  setSearching(
+    true
+  );
 
   showView(
     'loading'
@@ -657,13 +976,15 @@ async function search(query) {
         .querySelector(
           '#contentShell'
         )
-        .offsetTop - 95,
+        .offsetTop -
+      95,
 
     behavior:
       'smooth'
   });
 
-  const batchSize = 8;
+  const batchSize =
+    8;
 
   try {
     const first =
@@ -696,14 +1017,15 @@ async function search(query) {
     if (
       first.batch.hasMore
     ) {
-      const offsets = [];
+      const offsets =
+        [];
 
       for (
         let offset =
           first.batch.nextOffset;
 
         offset <
-          first.totalStoreCount;
+        first.totalStoreCount;
 
         offset +=
           batchSize
@@ -713,7 +1035,8 @@ async function search(query) {
         );
       }
 
-      let cursor = 0;
+      let cursor =
+        0;
 
       const workerCount =
         Math.min(
@@ -753,12 +1076,12 @@ async function search(query) {
             updateSearchProgress(
               state.response,
 
-              state.response
-                .checkedStoreCount >=
-                state.response
-                  .totalStoreCount
+              state.response.checkedStoreCount >=
+                state.response.totalStoreCount
             );
-          } catch (error) {
+          } catch (
+            error
+          ) {
             if (
               error.name ===
               'AbortError'
@@ -766,29 +1089,23 @@ async function search(query) {
               throw error;
             }
 
-            state.response
-              .checkedStoreCount =
-                Math.min(
-                  state.response
-                    .totalStoreCount,
+            state.response.checkedStoreCount =
+              Math.min(
+                state.response.totalStoreCount,
 
-                  state.response
-                    .checkedStoreCount +
-                    batchSize
-                );
+                state.response.checkedStoreCount +
+                  batchSize
+              );
 
-            state.response
-              .durationMs =
-                Date.now() -
-                state.searchStartedAt;
+            state.response.durationMs =
+              Date.now() -
+              state.searchStartedAt;
 
             updateSearchProgress(
               state.response,
 
-              state.response
-                .checkedStoreCount >=
-                state.response
-                  .totalStoreCount
+              state.response.checkedStoreCount >=
+                state.response.totalStoreCount
             );
           }
         }
@@ -801,7 +1118,8 @@ async function search(query) {
               workerCount
           },
 
-          () => worker()
+          () =>
+            worker()
         )
       );
     }
@@ -818,7 +1136,9 @@ async function search(query) {
       state.response,
       true
     );
-  } catch (error) {
+  } catch (
+    error
+  ) {
     if (
       error.name ===
       'AbortError'
@@ -856,11 +1176,15 @@ async function search(query) {
       );
     }
   } finally {
-    setSearching(false);
+    setSearching(
+      false
+    );
   }
 }
 
-function renderResults(data) {
+function renderResults(
+  data
+) {
   elements.gameIcon.textContent =
     data.game.icon;
 
@@ -886,7 +1210,8 @@ function renderResults(data) {
     );
 
   elements.duration.textContent =
-    data.durationMs >= 1000
+    data.durationMs >=
+    1000
       ? `${(
           data.durationMs /
           1000
@@ -899,20 +1224,24 @@ function renderResults(data) {
   elements.resultNotice.textContent =
     data.notice;
 
-  renderProviders(data);
+  renderProviders(
+    data
+  );
 
-  populateStoreFilter(data);
+  populateStoreFilter(
+    data
+  );
 
-  /*
-   * Filter Jenis Paket selalu
-   * dibentuk ulang dari hasil terbaru.
-   */
-  populateTypeFilter(data);
+  populateTypeFilter(
+    data
+  );
 
   renderPackages();
 }
 
-function renderProviders(data) {
+function renderProviders(
+  data
+) {
   elements.providerStatuses.textContent =
     '';
 
@@ -1041,11 +1370,9 @@ function renderProviders(data) {
       info
     );
 
-    elements
-      .providerStatuses
-      .append(
-        card
-      );
+    elements.providerStatuses.append(
+      card
+    );
   }
 }
 
@@ -1053,9 +1380,7 @@ function populateStoreFilter(
   data
 ) {
   const current =
-    elements
-      .storeFilter
-      .value;
+    elements.storeFilter.value;
 
   const stores =
     new Map();
@@ -1075,58 +1400,64 @@ function populateStoreFilter(
     }
   }
 
-  elements
-    .storeFilter
-    .replaceChildren(
-      new Option(
-        'Semua toko',
-        'all'
-      )
-    );
+  elements.storeFilter.replaceChildren(
+    new Option(
+      'Semua toko',
+      'all'
+    )
+  );
 
   [...stores.entries()]
     .sort(
-      (a, b) =>
+      (
+        a,
+        b
+      ) =>
         a[1].localeCompare(
           b[1],
           'id'
         )
     )
     .forEach(
-      ([id, name]) => {
-        elements
-          .storeFilter
-          .add(
-            new Option(
-              name,
-              id
-            )
-          );
+      (
+        [
+          id,
+          name
+        ]
+      ) => {
+        elements.storeFilter.add(
+          new Option(
+            name,
+            id
+          )
+        );
       }
     );
 
   if (
-    [...stores.keys()]
-      .includes(
-        current
-      )
+    [...stores.keys()].includes(
+      current
+    )
   ) {
-    elements
-      .storeFilter
-      .value =
-        current;
+    elements.storeFilter.value =
+      current;
   } else {
-    elements
-      .storeFilter
-      .value =
-        'all';
+    elements.storeFilter.value =
+      'all';
   }
 }
 
-function normalizeFilterKey(value) {
-  return String(value || '')
+function normalizeFilterKey(
+  value
+) {
+  return String(
+    value ||
+    ''
+  )
     .toLowerCase()
-    .normalize('NFKD')
+    .normalize(
+      'NFKD'
+    )
     .replace(
       /[\u0300-\u036f]/g,
       ''
@@ -1141,203 +1472,216 @@ function normalizeFilterKey(value) {
     );
 }
 
-function detectPackageUnit(group) {
-  /*
-   * Gunakan unit backend apabila
-   * sudah merupakan unit spesifik.
-   */
-  const backendUnit =
-    String(
-      group?.unit || ''
-    )
-      .trim();
-
-  const genericUnits = [
-    '',
-    'item',
-    'currency',
-    'nominal',
-    'lainnya',
-    'other'
-  ];
-
-  if (
-    !genericUnits.includes(
-      backendUnit.toLowerCase()
-    )
-  ) {
-    /*
-     * Normalisasi beberapa variasi.
-     */
-    if (
-      /^diamond(?:s)?$/i.test(
-        backendUnit
-      )
-    ) {
-      return 'Diamonds';
-    }
-
-    if (
-      /^uc$/i.test(
-        backendUnit
-      )
-    ) {
-      return 'UC';
-    }
-
-    if (
-      /^vp$/i.test(
-        backendUnit
-      )
-    ) {
-      return 'Valorant Points (VP)';
-    }
-
-    return backendUnit;
-  }
-
-  /*
-   * Deteksi dari seluruh produk
-   * di dalam group, bukan hanya
-   * offer pertama.
-   */
-  const sample = [
-    group?.name || '',
-
-    ...(group?.offers || [])
-      .map(
-        (offer) =>
-          offer?.originalName || ''
-      )
-  ]
-    .join(' ')
-    .toLowerCase();
-
-  if (
-    /\bdiamond(?:s)?\b/i.test(
-      sample
-    )
-  ) {
-    return 'Diamonds';
-  }
-
-  if (
-    /\buc\b/i.test(
-      sample
-    )
-  ) {
-    return 'UC';
-  }
-
-  if (
-    /\bvp\b|valorant\s+points?/i.test(
-      sample
-    )
-  ) {
-    return 'Valorant Points (VP)';
-  }
-
-  if (
-    /genesis\s+crystal(?:s)?/i.test(
-      sample
-    )
-  ) {
-    return 'Genesis Crystals';
-  }
-
-  if (
-    /\bcrystal(?:s)?\b/i.test(
-      sample
-    )
-  ) {
-    return 'Crystals';
-  }
-
-  if (
-    /\bcoin(?:s)?\b/i.test(
-      sample
-    )
-  ) {
-    return 'Coins';
-  }
-
-  if (
-    /\btoken(?:s)?\b/i.test(
-      sample
-    )
-  ) {
-    return 'Tokens';
-  }
-
-  if (
-    /\bpoint(?:s)?\b/i.test(
-      sample
-    )
-  ) {
-    return 'Points';
-  }
-
-  if (
-    /\bvoucher(?:s)?\b/i.test(
-      sample
-    )
-  ) {
-    return 'Voucher';
-  }
-
-  if (
-    /\bcredit(?:s)?\b/i.test(
-      sample
-    )
-  ) {
-    return 'Credits';
-  }
-
-  if (
-    /\bcp\b/i.test(
-      sample
-    )
-  ) {
-    return 'CP';
-  }
-
-  return 'Nominal';
-}
-
-function getPackageFilterMeta(group) {
+function getPackageFilterMeta(
+  group
+) {
   const type =
     String(
       group?.packageType ||
       'other'
-    )
-      .trim()
-      .toLowerCase();
+    );
 
-  /*
-   * Package type currency tidak lagi
-   * ditampilkan sebagai
-   * "Currency / nominal".
-   *
-   * Label mengikuti unit aktual.
-   */
   if (
-    type === 'currency'
+    type ===
+    'currency'
   ) {
-    const unit =
-      detectPackageUnit(
-        group
-      );
+    let unit =
+      String(
+        group?.unit ||
+        ''
+      )
+        .trim();
+
+    if (
+      !unit ||
+      unit ===
+      'Item'
+    ) {
+      const sample =
+        `${group?.name || ''} ${group?.offers?.[0]?.originalName || ''}`;
+
+      if (
+        /lunar\s+crystal(?:s)?/i.test(
+          sample
+        )
+      ) {
+        unit =
+          'Lunar Crystals';
+      } else if (
+        /genesis\s+crystal(?:s)?/i.test(
+          sample
+        )
+      ) {
+        unit =
+          'Genesis Crystals';
+      } else if (
+        /rift\s*crystal(?:s)?|riftcrystal(?:s)?/i.test(
+          sample
+        )
+      ) {
+        unit =
+          'Riftcrystals';
+      } else if (
+        /\borigeometry\b/i.test(
+          sample
+        )
+      ) {
+        unit =
+          'Origeometry';
+      } else if (
+        /\bstarstone(?:s)?\b/i.test(
+          sample
+        )
+      ) {
+        unit =
+          'Starstones';
+      } else if (
+        /\bopal(?:s)?\b/i.test(
+          sample
+        )
+      ) {
+        unit =
+          'Opals';
+      } else if (
+        /\brobux\b/i.test(
+          sample
+        )
+      ) {
+        unit =
+          'Robux';
+      } else if (
+        /\bdiamond(?:s)?\b/i.test(
+          sample
+        )
+      ) {
+        unit =
+          'Diamonds';
+      } else if (
+        /\buc\b/i.test(
+          sample
+        )
+      ) {
+        unit =
+          'UC';
+      } else if (
+        /\bcp\b|call\s+of\s+duty\s+points?/i.test(
+          sample
+        )
+      ) {
+        unit =
+          'CP';
+      } else if (
+        /\bvp\b|valorant\s+points?/i.test(
+          sample
+        )
+      ) {
+        unit =
+          'VP';
+      } else if (
+        /\bcrystal(?:s)?\b/i.test(
+          sample
+        )
+      ) {
+        unit =
+          'Crystals';
+      } else if (
+        /\bcoin(?:s)?\b/i.test(
+          sample
+        )
+      ) {
+        unit =
+          'Coins';
+      } else if (
+        /\btoken(?:s)?\b/i.test(
+          sample
+        )
+      ) {
+        unit =
+          'Tokens';
+      } else if (
+        /\bpoint(?:s)?\b/i.test(
+          sample
+        )
+      ) {
+        unit =
+          'Points';
+      } else if (
+        /\bvoucher(?:s)?\b/i.test(
+          sample
+        )
+      ) {
+        unit =
+          'Vouchers';
+      } else {
+        unit =
+          'Nominal';
+      }
+    }
+
+    const unitLabels = {
+      'Lunar Crystals':
+        'Lunar Crystals',
+
+      'Genesis Crystals':
+        'Genesis Crystals',
+
+      Riftcrystals:
+        'Riftcrystals',
+
+      Origeometry:
+        'Origeometry',
+
+      Starstones:
+        'Starstones',
+
+      Opals:
+        'Opals',
+
+      Robux:
+        'Robux',
+
+      Diamonds:
+        'Diamonds',
+
+      UC:
+        'UC',
+
+      CP:
+        'Call of Duty Points (CP)',
+
+      VP:
+        'Valorant Points (VP)',
+
+      Crystals:
+        'Crystals',
+
+      Points:
+        'Points',
+
+      Coins:
+        'Coins',
+
+      Tokens:
+        'Tokens',
+
+      Vouchers:
+        'Vouchers',
+
+      Voucher:
+        'Voucher',
+
+      Nominal:
+        'Nominal'
+    };
 
     return {
       key:
-        `currency:${
-          normalizeFilterKey(
-            unit
-          ) ||
-          'nominal'
-        }`,
+        `currency:${normalizeFilterKey(unit) || 'nominal'}`,
 
       label:
+        unitLabels[
+          unit
+        ] ||
         unit,
 
       order:
@@ -1351,6 +1695,20 @@ function getPackageFilterMeta(group) {
         'Weekly Diamond Pass',
       order:
         20
+    },
+
+    'weekly-card-plus': {
+      label:
+        'Weekly Card Plus',
+      order:
+        25
+    },
+
+    'weekly-card': {
+      label:
+        'Weekly Card',
+      order:
+        27
     },
 
     starlight: {
@@ -1383,14 +1741,14 @@ function getPackageFilterMeta(group) {
 
     'elite-bundle': {
       label:
-        'Elite Bundle',
+        'Weekly Elite Bundle',
       order:
         70
     },
 
     'epic-bundle': {
       label:
-        'Epic Bundle',
+        'Monthly Epic Bundle',
       order:
         80
     },
@@ -1402,18 +1760,11 @@ function getPackageFilterMeta(group) {
         90
     },
 
-    'weekly-membership': {
+    'monthly-pass': {
       label:
-        'Weekly Membership',
+        'Monthly Pass',
       order:
         100
-    },
-
-    'monthly-membership': {
-      label:
-        'Monthly Membership',
-      order:
-        110
     },
 
     other: {
@@ -1424,14 +1775,17 @@ function getPackageFilterMeta(group) {
     }
   };
 
-  if (
-    specialTypes[type]
-  ) {
+  const meta =
+    specialTypes[
+      type
+    ];
+
+  if (meta) {
     return {
       key:
         type,
 
-      ...specialTypes[type]
+      ...meta
     };
   }
 
@@ -1440,38 +1794,32 @@ function getPackageFilterMeta(group) {
       type,
 
     label:
-      String(type)
-        .split('-')
-        .filter(Boolean)
-        .map(
-          (word) =>
-            word.charAt(0)
-              .toUpperCase() +
-            word.slice(1)
-        )
-        .join(' '),
+      String(
+        group?.name ||
+        type
+      )
+        .replaceAll(
+          '-',
+          ' '
+        ),
 
     order:
       500
   };
 }
 
-function populateTypeFilter(data) {
-  const currentValue =
-    elements
-      .typeFilter
-      .value;
+function populateTypeFilter(
+  data
+) {
+  const current =
+    elements.typeFilter.value;
 
   const filters =
     new Map();
 
-  /*
-   * Buat opsi berdasarkan group
-   * yang benar-benar ditemukan.
-   */
   for (
     const group of
-    data?.groups || []
+    data.groups
   ) {
     const meta =
       getPackageFilterMeta(
@@ -1485,6 +1833,7 @@ function populateTypeFilter(data) {
     ) {
       filters.set(
         meta.key,
+
         {
           ...meta,
           count: 0
@@ -1492,17 +1841,19 @@ function populateTypeFilter(data) {
       );
     }
 
-    filters
-      .get(
-        meta.key
-      )
-      .count += 1;
+    filters.get(
+      meta.key
+    ).count +=
+      1;
   }
 
   const options =
     [...filters.values()]
       .sort(
-        (a, b) =>
+        (
+          a,
+          b
+        ) =>
           a.order -
             b.order ||
           a.label.localeCompare(
@@ -1512,54 +1863,37 @@ function populateTypeFilter(data) {
       );
 
   /*
-   * Hapus seluruh option lama.
+   * Selalu reset opsi dari hasil
+   * pencarian sebelumnya.
    */
-  elements
-    .typeFilter
-    .replaceChildren();
+  elements.typeFilter.replaceChildren(
+    new Option(
+      'Semua paket',
+      'all'
+    )
+  );
 
-  /*
-   * Default selalu tersedia.
-   */
-  elements
-    .typeFilter
-    .add(
-      new Option(
-        'Semua paket',
-        'all'
-      )
-    );
-
-  /*
-   * Tambahkan hanya jenis paket
-   * dari hasil pencarian saat ini.
-   */
   for (
     const option of
     options
   ) {
-    elements
-      .typeFilter
-      .add(
-        new Option(
-          option.label,
-          option.key
-        )
-      );
+    elements.typeFilter.add(
+      new Option(
+        option.label,
+        option.key
+      )
+    );
   }
 
-  /*
-   * Pertahankan pilihan jika
-   * masih tersedia.
-   */
   if (
-    currentValue !== 'all' &&
+    current ===
+      'all' ||
     filters.has(
-      currentValue
+      current
     )
   ) {
     elements.typeFilter.value =
-      currentValue;
+      current;
   } else {
     elements.typeFilter.value =
       'all';
@@ -1575,19 +1909,13 @@ function getVisibleGroups() {
   }
 
   const type =
-    elements
-      .typeFilter
-      .value;
+    elements.typeFilter.value;
 
   const store =
-    elements
-      .storeFilter
-      .value;
+    elements.storeFilter.value;
 
   const sort =
-    elements
-      .sortSelect
-      .value;
+    elements.sortSelect.value;
 
   let groups =
     data.groups
@@ -1597,7 +1925,8 @@ function getVisibleGroups() {
           ...group,
 
           offers:
-            store === 'all'
+            store ===
+            'all'
               ? group.offers
               : group.offers.filter(
                   (offer) =>
@@ -1609,19 +1938,18 @@ function getVisibleGroups() {
 
       .filter(
         (group) =>
-          group.offers.length > 0
+          group.offers.length >
+          0
       )
 
-      /*
-       * Filtering berdasarkan
-       * dynamic package key.
-       */
       .filter(
         (group) =>
-          type === 'all' ||
+          type ===
+            'all' ||
           getPackageFilterMeta(
             group
-          ).key === type
+          ).key ===
+            type
       )
 
       .map(
@@ -1629,7 +1957,10 @@ function getVisibleGroups() {
           const offers =
             [...group.offers]
               .sort(
-                (a, b) =>
+                (
+                  a,
+                  b
+                ) =>
                   a.finalPrice -
                   b.finalPrice
               );
@@ -1650,7 +1981,7 @@ function getVisibleGroups() {
             highestPrice:
               offers[
                 offers.length -
-                  1
+                1
               ].finalPrice,
 
             savings:
@@ -1659,7 +1990,7 @@ function getVisibleGroups() {
 
                 offers[
                   offers.length -
-                    1
+                  1
                 ].finalPrice -
                   offers[0]
                     .finalPrice
@@ -1685,12 +2016,18 @@ function getVisibleGroups() {
 
   const sorters = {
     'price-asc':
-      (a, b) =>
+      (
+        a,
+        b
+      ) =>
         a.cheapestPrice -
         b.cheapestPrice,
 
     'amount-asc':
-      (a, b) =>
+      (
+        a,
+        b
+      ) =>
         (
           a.totalAmount ??
           Number.MAX_SAFE_INTEGER
@@ -1703,14 +2040,20 @@ function getVisibleGroups() {
           b.cheapestPrice,
 
     'stores-desc':
-      (a, b) =>
+      (
+        a,
+        b
+      ) =>
         b.storeCount -
           a.storeCount ||
         a.cheapestPrice -
           b.cheapestPrice,
 
     'savings-desc':
-      (a, b) =>
+      (
+        a,
+        b
+      ) =>
         b.savings -
           a.savings ||
         a.cheapestPrice -
@@ -1718,7 +2061,9 @@ function getVisibleGroups() {
   };
 
   return groups.sort(
-    sorters[sort] ||
+    sorters[
+      sort
+    ] ||
     sorters[
       'price-asc'
     ]
@@ -1736,7 +2081,8 @@ function renderPackages() {
     `${groups.length} paket`;
 
   elements.emptyFilter.hidden =
-    groups.length > 0;
+    groups.length >
+    0;
 
   groups.forEach(
     (
@@ -1744,12 +2090,9 @@ function renderPackages() {
       index
     ) => {
       const node =
-        elements
-          .template
-          .content
-          .cloneNode(
-            true
-          );
+        elements.template.content.cloneNode(
+          true
+        );
 
       const card =
         node.querySelector(
@@ -1811,7 +2154,7 @@ function renderPackages() {
         'currency'
           ? String(
               group.totalAmount ||
-                ''
+              ''
             ).slice(
               0,
               4
@@ -1830,15 +2173,12 @@ function renderPackages() {
 
       liveBadge.classList.toggle(
         'fallback',
+
         !group.hasLivePrice
       );
 
       subtitle.textContent =
-        `${group.storeCount} toko tersedia · ${
-          getPackageFilterMeta(
-            group
-          ).label
-        }`;
+        `${group.storeCount} toko tersedia · ${getPackageFilterMeta(group).label}`;
 
       price.textContent =
         rupiah(
@@ -1849,7 +2189,8 @@ function renderPackages() {
         `di ${group.cheapestStore}`;
 
       saving.textContent =
-        group.savings > 0
+        group.savings >
+        0
           ? rupiah(
               group.savings
             )
@@ -1863,14 +2204,16 @@ function renderPackages() {
           rows.append(
             renderOfferRow(
               offer,
+
               offerIndex ===
-                0
+              0
             )
           )
       );
 
       summary.addEventListener(
         'click',
+
         () => {
           const open =
             card.classList.toggle(
@@ -1879,7 +2222,9 @@ function renderPackages() {
 
           summary.setAttribute(
             'aria-expanded',
-            String(open)
+            String(
+              open
+            )
           );
 
           comparison.hidden =
@@ -1887,7 +2232,10 @@ function renderPackages() {
         }
       );
 
-      if (index < 2) {
+      if (
+        index <
+        2
+      ) {
         card.classList.add(
           'open'
         );
@@ -1901,11 +2249,9 @@ function renderPackages() {
           false;
       }
 
-      elements
-        .packageList
-        .append(
-          node
-        );
+      elements.packageList.append(
+        node
+      );
     }
   );
 }
@@ -1913,14 +2259,26 @@ function renderPackages() {
 function packageAbbreviation(
   name
 ) {
-  return String(name)
-    .split(/\s+/)
-    .filter(Boolean)
-    .map(
-      (part) => part[0]
+  return String(
+    name
+  )
+    .split(
+      /\s+/
     )
-    .join('')
-    .slice(0, 4)
+    .filter(
+      Boolean
+    )
+    .map(
+      (part) =>
+        part[0]
+    )
+    .join(
+      ''
+    )
+    .slice(
+      0,
+      4
+    )
     .toUpperCase();
 }
 
@@ -2010,7 +2368,8 @@ function renderOfferRow(
     `offer-status ${offer.source}`;
 
   status.textContent =
-    offer.source === 'live'
+    offer.source ===
+    'live'
       ? (
           isBest
             ? 'Termurah · Live'
@@ -2044,6 +2403,7 @@ function renderOfferRow(
 
   link.insertAdjacentHTML(
     'beforeend',
+
     '<svg viewBox="0 0 24 24" fill="none"><path d="M14 5h5v5M10 14 19 5M19 13v6H5V5h6"/></svg>'
   );
 
@@ -2062,7 +2422,10 @@ function renderSuggestions(
   value
 ) {
   const query =
-    String(value || '')
+    String(
+      value ||
+      ''
+    )
       .toLowerCase()
       .trim();
 
@@ -2095,7 +2458,9 @@ function renderSuggestions(
         5
       );
 
-  if (!matches.length) {
+  if (
+    !matches.length
+  ) {
     elements.suggestions.hidden =
       true;
 
@@ -2162,17 +2527,16 @@ function renderSuggestions(
 
       button.addEventListener(
         'click',
+
         () =>
           search(
             game.name
           )
       );
 
-      elements
-        .suggestions
-        .append(
-          button
-        );
+      elements.suggestions.append(
+        button
+      );
     }
   );
 
@@ -2193,23 +2557,23 @@ function initTheme() {
       )
       .matches;
 
-  document
-    .documentElement
-    .dataset
-    .theme =
-      saved ||
-      (
-        darkPreferred
-          ? 'dark'
-          : 'light'
-      );
+  document.documentElement.dataset.theme =
+    saved ||
+    (
+      darkPreferred
+        ? 'dark'
+        : 'light'
+    );
 }
 
 initTheme();
 
 elements.form.addEventListener(
   'submit',
-  (event) => {
+
+  (
+    event
+  ) => {
     event.preventDefault();
 
     search(
@@ -2220,7 +2584,10 @@ elements.form.addEventListener(
 
 elements.input.addEventListener(
   'input',
-  (event) =>
+
+  (
+    event
+  ) =>
     renderSuggestions(
       event.target.value
     )
@@ -2228,6 +2595,7 @@ elements.input.addEventListener(
 
 elements.input.addEventListener(
   'focus',
+
   () =>
     renderSuggestions(
       elements.input.value
@@ -2236,7 +2604,10 @@ elements.input.addEventListener(
 
 document.addEventListener(
   'click',
-  (event) => {
+
+  (
+    event
+  ) => {
     if (
       !elements.form.contains(
         event.target
@@ -2256,6 +2627,7 @@ document
     (button) =>
       button.addEventListener(
         'click',
+
         () =>
           search(
             button.dataset.query
@@ -2265,6 +2637,7 @@ document
 
 elements.retryButton.addEventListener(
   'click',
+
   () =>
     search(
       state.query ||
@@ -2274,6 +2647,7 @@ elements.retryButton.addEventListener(
 
 elements.refreshButton.addEventListener(
   'click',
+
   () =>
     search(
       state.query
@@ -2297,6 +2671,7 @@ elements.sortSelect.addEventListener(
 
 elements.toggleProviders.addEventListener(
   'click',
+
   () => {
     state.providerPanelVisible =
       !state.providerPanelVisible;
@@ -2313,21 +2688,16 @@ elements.toggleProviders.addEventListener(
 
 elements.themeButton.addEventListener(
   'click',
+
   () => {
     const next =
-      document
-        .documentElement
-        .dataset
-        .theme ===
+      document.documentElement.dataset.theme ===
       'dark'
         ? 'light'
         : 'dark';
 
-    document
-      .documentElement
-      .dataset
-      .theme =
-        next;
+    document.documentElement.dataset.theme =
+      next;
 
     localStorage.setItem(
       'topup-scout-theme',
