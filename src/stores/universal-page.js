@@ -8,12 +8,21 @@ const {
 
 const {
   htmlToLines,
+  isProductName,
   extractOffersFromLines,
   extractJsonScriptOffers,
   dedupeOffers,
   decodeEntities
 } = require(
   '../utils/html'
+);
+
+const {
+  extractStructuredOffers,
+  extractStructuredIdentityText,
+  detectDynamicPageSignals
+} = require(
+  '../utils/structured-data'
 );
 
 const {
@@ -34,6 +43,27 @@ const COMMON_TEMPLATES = [
 
 const BAD_LINK_PATTERN =
   /\b(?:login|register|daftar|masuk|berita|news|article|artikel|blog|promo|promosi|terms|privacy|affiliate|reseller|karir|career|contact|kontak|about|tentang)\b/i;
+
+function providerError(
+  code,
+  message,
+  details = {}
+) {
+  const error =
+    new Error(
+      message
+    );
+
+  error.code =
+    code;
+
+  Object.assign(
+    error,
+    details
+  );
+
+  return error;
+}
 
 function absoluteUrl(
   value,
@@ -170,10 +200,11 @@ function gameIdentityCandidates(
     String(
       game?.id ||
       ''
-    ).replace(
-      /-/g,
-      ' '
-    ),
+    )
+      .replace(
+        /-/g,
+        ' '
+      ),
 
     game?.name,
     game?.shortName,
@@ -523,9 +554,8 @@ function linkScore(
         score =
           Math.max(
             score,
-
             118 +
-            compact.length
+              compact.length
           );
       }
 
@@ -537,9 +567,8 @@ function linkScore(
         score =
           Math.max(
             score,
-
             100 +
-            compact.length
+              compact.length
           );
       }
     }
@@ -580,16 +609,21 @@ function makeCandidateUrls(
   homepageHtml
 ) {
   const directUrls = [
-    store.gameUrls?.[
-      game.id
-    ],
+    store
+      .gameUrls
+      ?.[
+        game.id
+      ],
 
-    game.stores?.[
-      store.id
-    ]
-  ].filter(
-    Boolean
-  );
+    game
+      .stores
+      ?.[
+        store.id
+      ]
+  ]
+    .filter(
+      Boolean
+    );
 
   const discovered =
     homepageHtml
@@ -597,7 +631,6 @@ function makeCandidateUrls(
           homepageHtml,
           store.homepage
         )
-
           .map(
             (link) => ({
               ...link,
@@ -610,24 +643,23 @@ function makeCandidateUrls(
                 )
             })
           )
-
           .filter(
             (link) =>
               link.score >=
               85
           )
-
           .sort(
-            (a, b) =>
+            (
+              a,
+              b
+            ) =>
               b.score -
               a.score
           )
-
           .slice(
             0,
             4
           )
-
           .map(
             (link) =>
               link.href
@@ -643,13 +675,11 @@ function makeCandidateUrls(
 
     ...COMMON_TEMPLATES
   ]
-
     .map(
       (template) =>
         String(
           template
         )
-
           .replaceAll(
             '{homepage}',
 
@@ -662,13 +692,11 @@ function makeCandidateUrls(
                 ''
               )
           )
-
           .replaceAll(
             '{gameSlug}',
             game.id
           )
     )
-
     .map(
       (url) =>
         absoluteUrl(
@@ -676,7 +704,6 @@ function makeCandidateUrls(
           store.homepage
         )
     )
-
     .filter(
       Boolean
     );
@@ -688,7 +715,6 @@ function makeCandidateUrls(
         ...discovered,
         ...fromTemplates
       ]
-
         .map(
           (url) =>
             absoluteUrl(
@@ -696,15 +722,15 @@ function makeCandidateUrls(
               store.homepage
             )
         )
-
         .filter(
           Boolean
         )
     )
-  ].slice(
-    0,
-    10
-  );
+  ]
+    .slice(
+      0,
+      10
+    );
 }
 
 function getPageSignals(
@@ -738,6 +764,21 @@ function getPageSignals(
       ]
     );
 
+  /*
+   * Penting untuk website modern.
+   *
+   * Nama game bisa tidak ada di DOM,
+   * tetapi berada di:
+   *
+   * __NEXT_DATA__
+   * JSON-LD
+   * __INITIAL_STATE__
+   */
+  const structuredText =
+    extractStructuredIdentityText(
+      html
+    );
+
   const lines =
     htmlToLines(
       html
@@ -758,6 +799,8 @@ function getPageSignals(
       meta.join(
         ' '
       ),
+
+    structuredText,
 
     bodyText:
       lines
@@ -823,11 +866,9 @@ function strongIdentityMatches(
   return gameIdentityCandidates(
     game
   )
-
     .filter(
       isStrongIdentity
     )
-
     .filter(
       (identity) =>
         containsPhrase(
@@ -844,14 +885,12 @@ function shortIdentityMatches(
   return gameIdentityCandidates(
     game
   )
-
     .filter(
       (identity) =>
         !isStrongIdentity(
           identity
         )
     )
-
     .filter(
       (identity) =>
         containsPhrase(
@@ -867,7 +906,8 @@ function pageHasTargetUnitEvidence(
 ) {
   const unitAliases =
     uniqueNormalized(
-      game?.unitAliases ||
+      game
+        ?.unitAliases ||
       []
     );
 
@@ -924,10 +964,15 @@ function findCompetingStructuredGame(
               .length
         )
         .sort(
-          (a, b) =>
+          (
+            a,
+            b
+          ) =>
             b -
             a
-        )[0];
+        )[
+          0
+        ];
 
     if (
       !best ||
@@ -981,6 +1026,12 @@ function validatePageForGame(
       game
     );
 
+  const structuredMatches =
+    strongIdentityMatches(
+      signals.structuredText,
+      game
+    );
+
   const urlMatches =
     strongIdentityMatches(
       urlText,
@@ -1027,7 +1078,7 @@ function validatePageForGame(
 
   const unitEvidence =
     pageHasTargetUnitEvidence(
-      `${signals.headingText} ${signals.metaText} ${signals.bodyText}`,
+      `${signals.headingText} ${signals.metaText} ${signals.structuredText} ${signals.bodyText}`,
       game
     );
 
@@ -1062,6 +1113,13 @@ function validatePageForGame(
   ) {
     contentScore +=
       75;
+  }
+
+  if (
+    structuredMatches.length
+  ) {
+    contentScore +=
+      70;
   }
 
   if (
@@ -1112,10 +1170,14 @@ function validatePageForGame(
       100;
   }
 
+  /*
+   * Page jelas menunjukkan game lain.
+   */
   if (
     competingTitle &&
     !titleMatches.length &&
-    !headingMatches.length
+    !headingMatches.length &&
+    !structuredMatches.length
   ) {
     return {
       ok:
@@ -1132,13 +1194,17 @@ function validatePageForGame(
     };
   }
 
+  /*
+   * Soft 404 / redirect homepage.
+   */
   if (
     homepageLikeUrl(
       finalUrl,
       homepage
     ) &&
     !titleMatches.length &&
-    !headingMatches.length
+    !headingMatches.length &&
+    !structuredMatches.length
   ) {
     return {
       ok:
@@ -1161,6 +1227,8 @@ function validatePageForGame(
     headingMatches.length >
       0 ||
     metaMatches.length >
+      0 ||
+    structuredMatches.length >
       0;
 
   const hasRepeatedBodyIdentity =
@@ -1195,11 +1263,9 @@ function containsExplicitGameName(
   return gameIdentityCandidates(
     game
   )
-
     .filter(
       isStrongIdentity
     )
-
     .some(
       (identity) =>
         containsPhrase(
@@ -1325,12 +1391,6 @@ function namedPackageMatchesGame(
     );
   }
 
-  /*
-   * Wuthering Waves
-   *
-   * $5 akan menjadi angka biasa
-   * setelah normalizeText().
-   */
   if (
     /lunite subscription/.test(
       text
@@ -1353,7 +1413,8 @@ function offerMatchesGame(
 ) {
   const name =
     String(
-      offer?.originalName ||
+      offer
+        ?.originalName ||
       ''
     )
       .trim();
@@ -1382,7 +1443,8 @@ function offerMatchesGame(
 
   const unitAliases =
     uniqueNormalized(
-      game?.unitAliases ||
+      game
+        ?.unitAliases ||
       []
     );
 
@@ -1413,6 +1475,119 @@ function offerMatchesGame(
   );
 }
 
+function buildParserDiagnostics({
+  html,
+  lines,
+  lineOffers,
+  jsonOffers,
+  structured,
+  filteredOffers
+}) {
+  const visibleProductCandidates =
+    lines.filter(
+      (line) =>
+        isProductName(
+          line
+        )
+    ).length;
+
+  const visiblePriceCandidates =
+    lines.filter(
+      (line) =>
+        /(?:\bIDR\b|\bRp\.?)/i.test(
+          line
+        )
+    ).length;
+
+  const dynamic =
+    structured
+      ?.diagnostics
+      ?.dynamic ||
+    detectDynamicPageSignals(
+      html
+    );
+
+  let parserReason =
+    'UNSUPPORTED_STRUCTURE';
+
+  if (
+    lineOffers.length >
+      0 ||
+    jsonOffers.length >
+      0 ||
+    structured.offers.length >
+      0
+  ) {
+    parserReason =
+      filteredOffers.length ===
+        0
+        ? 'PRODUCTS_REJECTED_BY_GAME_VALIDATION'
+        : 'PARTIAL_MATCH_ONLY';
+  } else if (
+    dynamic.likelyDynamic
+  ) {
+    parserReason =
+      'JS_RENDERED_CONTENT';
+  } else if (
+    visibleProductCandidates >
+      0 &&
+    visiblePriceCandidates ===
+      0
+  ) {
+    parserReason =
+      'PRODUCT_FOUND_NO_PRICE';
+  } else if (
+    visibleProductCandidates ===
+      0 &&
+    visiblePriceCandidates >
+      0
+  ) {
+    parserReason =
+      'PRICE_FOUND_NO_PRODUCT';
+  } else if (
+    structured
+      .diagnostics
+      .documentCount >
+    0
+  ) {
+    parserReason =
+      'JSON_DATA_FOUND_NO_MATCH';
+  } else if (
+    visibleProductCandidates ===
+    0
+  ) {
+    parserReason =
+      'HTML_NO_PRODUCT';
+  }
+
+  return {
+    parserReason,
+
+    visibleLineCount:
+      lines.length,
+
+    visibleProductCandidates,
+    visiblePriceCandidates,
+
+    lineOfferCount:
+      lineOffers.length,
+
+    legacyJsonOfferCount:
+      jsonOffers.length,
+
+    structuredOfferCount:
+      structured.offers.length,
+
+    filteredOfferCount:
+      filteredOffers.length,
+
+    structured:
+      structured.diagnostics,
+
+    dynamic
+  };
+}
+
 function parseOffers(
   html,
   finalUrl,
@@ -1436,12 +1611,21 @@ function parseOffers(
       'live'
   };
 
+  /*
+   * ======================================================
+   * LAYER 1
+   * Visible HTML
+   * ======================================================
+   */
+
+  const lines =
+    htmlToLines(
+      html
+    );
+
   const lineOffers =
     extractOffersFromLines(
-      htmlToLines(
-        html
-      ),
-
+      lines,
       {
         ...context,
 
@@ -1450,29 +1634,111 @@ function parseOffers(
       }
     );
 
+  /*
+   * ======================================================
+   * LAYER 2
+   * Legacy JSON parser
+   * ======================================================
+   */
+
   const jsonOffers =
     extractJsonScriptOffers(
       html,
       context
     );
 
-  return dedupeOffers([
-    ...lineOffers,
-    ...jsonOffers
-  ])
+  /*
+   * ======================================================
+   * LAYER 3
+   * Structured / framework state
+   * ======================================================
+   */
 
-    .filter(
-      (offer) =>
-        offerMatchesGame(
-          offer,
-          game
-        )
-    )
-
-    .slice(
-      0,
-      150
+  const structured =
+    extractStructuredOffers(
+      html,
+      context
     );
+
+  const rawOffers =
+    dedupeOffers([
+      ...lineOffers,
+      ...jsonOffers,
+      ...structured.offers
+    ]);
+
+  /*
+   * Validasi game tetap dipertahankan
+   * supaya produk game lain tidak
+   * ikut masuk.
+   */
+  const offers =
+    rawOffers
+      .filter(
+        (offer) =>
+          offerMatchesGame(
+            offer,
+            game
+          )
+      )
+      .slice(
+        0,
+        150
+      );
+
+  return {
+    offers,
+
+    diagnostics:
+      buildParserDiagnostics({
+        html,
+        lines,
+        lineOffers,
+        jsonOffers,
+        structured,
+
+        filteredOffers:
+          offers
+      })
+  };
+}
+
+function parserFailureMessage(
+  reason
+) {
+  const messages = {
+    JS_RENDERED_CONTENT:
+      'Konten produk kemungkinan dimuat melalui JavaScript/API setelah halaman dibuka',
+
+    PRODUCT_FOUND_NO_PRICE:
+      'Nama produk ditemukan, tetapi harga tidak ditemukan pada HTML server',
+
+    PRICE_FOUND_NO_PRODUCT:
+      'Harga ditemukan, tetapi nama produk tidak dapat dikenali',
+
+    JSON_DATA_FOUND_NO_MATCH:
+      'Data JSON ditemukan, tetapi struktur produk/harganya belum dikenali',
+
+    HTML_NO_PRODUCT:
+      'Tidak ada kandidat produk yang dapat dikenali pada HTML server',
+
+    PRODUCTS_REJECTED_BY_GAME_VALIDATION:
+      'Produk berhasil dibaca, tetapi tidak lolos validasi game target',
+
+    PARTIAL_MATCH_ONLY:
+      'Sebagian data berhasil dibaca, tetapi belum menghasilkan offer yang dapat digunakan',
+
+    UNSUPPORTED_STRUCTURE:
+      'Struktur halaman belum didukung parser saat ini'
+  };
+
+  return (
+    messages[
+      reason
+    ] ||
+    messages
+      .UNSUPPORTED_STRUCTURE
+  );
 }
 
 function createUniversalAdapter(
@@ -1498,7 +1764,8 @@ function createUniversalAdapter(
       if (
         !store.homepage
       ) {
-        throw new Error(
+        throw providerError(
+          'NOT_CONFIGURED',
           'URL toko belum dikonfigurasi'
         );
       }
@@ -1519,7 +1786,6 @@ function createUniversalAdapter(
         const homepage =
           await fetchText(
             store.homepage,
-
             {
               timeoutMs:
                 Math.min(
@@ -1563,6 +1829,9 @@ function createUniversalAdapter(
       const errors =
         [];
 
+      let strongestError =
+        null;
+
       for (
         const url of
         candidates.slice(
@@ -1574,7 +1843,6 @@ function createUniversalAdapter(
           const page =
             await fetchText(
               url,
-
               {
                 timeoutMs
               }
@@ -1583,6 +1851,12 @@ function createUniversalAdapter(
           const finalUrl =
             page.finalUrl ||
             url;
+
+          /*
+           * =================================================
+           * PAGE VALIDATION
+           * =================================================
+           */
 
           const validation =
             validatePageForGame(
@@ -1595,14 +1869,41 @@ function createUniversalAdapter(
           if (
             !validation.ok
           ) {
+            const error =
+              providerError(
+                'PAGE_NOT_VERIFIED',
+
+                `halaman tidak cocok: ${validation.reason}`,
+
+                {
+                  finalUrl,
+
+                  validationScore:
+                    validation.score
+                }
+              );
+
             errors.push(
-              `halaman tidak cocok: ${validation.reason}`
+              error.message
             );
+
+            if (
+              !strongestError
+            ) {
+              strongestError =
+                error;
+            }
 
             continue;
           }
 
-          const offers =
+          /*
+           * =================================================
+           * MULTI-LAYER PARSER
+           * =================================================
+           */
+
+          const parsed =
             parseOffers(
               page.text,
               finalUrl,
@@ -1611,20 +1912,69 @@ function createUniversalAdapter(
             );
 
           if (
-            offers.length
+            parsed
+              .offers
+              .length
           ) {
-            return offers;
+            return parsed.offers;
           }
 
+          const error =
+            providerError(
+              'PARSER_FAILED',
+
+              parserFailureMessage(
+                parsed
+                  .diagnostics
+                  .parserReason
+              ),
+
+              {
+                parserReason:
+                  parsed
+                    .diagnostics
+                    .parserReason,
+
+                parserDiagnostics:
+                  parsed
+                    .diagnostics,
+
+                finalUrl
+              }
+            );
+
           errors.push(
-            'halaman game cocok, tetapi harga/produk yang sesuai tidak ditemukan'
+            error.message
           );
+
+          strongestError =
+            error;
         } catch (
           error
         ) {
           errors.push(
             error.message
           );
+
+          if (
+            !strongestError ||
+            [
+              'ACCESS_BLOCKED',
+              'RATE_LIMITED',
+              'TIMEOUT',
+              'NETWORK_ERROR'
+            ].includes(
+              String(
+                error
+                  ?.code ||
+                ''
+              )
+                .toUpperCase()
+            )
+          ) {
+            strongestError =
+              error;
+          }
         }
       }
 
@@ -1635,22 +1985,47 @@ function createUniversalAdapter(
         throw homepageError;
       }
 
-      const reason =
-        errors[0] ||
-        homepageError?.message ||
-        'halaman game tidak ditemukan';
+      if (
+        strongestError
+      ) {
+        throw strongestError;
+      }
 
       if (
         store.verification !==
         'verified'
       ) {
-        throw new Error(
-          `Kandidat toko belum menghasilkan harga (${reason})`
+        throw providerError(
+          'PARSER_FAILED',
+
+          errors[
+            0
+          ] ||
+          homepageError
+            ?.message ||
+          'Kandidat toko belum menghasilkan harga',
+
+          {
+            parserReason:
+              'UNSUPPORTED_STRUCTURE'
+          }
         );
       }
 
-      throw new Error(
-        reason
+      throw providerError(
+        'PARSER_FAILED',
+
+        errors[
+          0
+        ] ||
+        homepageError
+          ?.message ||
+        'Halaman game atau harga tidak ditemukan',
+
+        {
+          parserReason:
+            'UNSUPPORTED_STRUCTURE'
+        }
       );
     }
   };
@@ -1662,5 +2037,7 @@ module.exports = {
   linkScore,
   makeCandidateUrls,
   validatePageForGame,
-  offerMatchesGame
+  offerMatchesGame,
+  parseOffers,
+  buildParserDiagnostics
 };
