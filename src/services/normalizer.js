@@ -87,6 +87,70 @@ const SPECIAL_TYPES = [
       'Monthly Pass'
   },
 
+  /*
+   * Honkai: Star Rail
+   */
+  {
+    type:
+      'express-supply-pass',
+
+    pattern:
+      /express\s+supply\s+pass/i,
+
+    label:
+      'Express Supply Pass'
+  },
+
+  /*
+   * Zenless Zone Zero
+   */
+  {
+    type:
+      'inter-knot-membership',
+
+    pattern:
+      /inter[-\s]*knot\s+membership/i,
+
+    label:
+      'Inter-Knot Membership'
+  },
+
+  /*
+   * Chaos Zero Nightmare
+   */
+  {
+    type:
+      'coronomicon-monthly',
+
+    pattern:
+      /coronomicon\s+monthly(?:\s+package)?/i,
+
+    label:
+      'Coronomicon Monthly Package'
+  },
+
+  {
+    type:
+      'special-data',
+
+    pattern:
+      /\bspecial\s+data\b/i,
+
+    label:
+      'Special Data'
+  },
+
+  {
+    type:
+      'zero-data',
+
+    pattern:
+      /\bzero\s+data\b/i,
+
+    label:
+      'Zero Data'
+  },
+
   {
     type: 'membership',
     pattern:
@@ -98,97 +162,159 @@ const SPECIAL_TYPES = [
 
 const UNIT_PATTERNS = [
   {
-    unit: 'Lunar Crystals',
+    unit:
+      'Lunar Crystals',
+
     pattern:
       /lunar\s+crystal(?:s)?/i
   },
 
   {
-    unit: 'Genesis Crystals',
+    unit:
+      'Genesis Crystals',
+
     pattern:
       /genesis\s+crystal(?:s)?/i
   },
 
+  /*
+   * Honkai: Star Rail
+   */
   {
-    unit: 'Riftcrystals',
+    unit:
+      'Oneiric Shards',
+
+    pattern:
+      /oneiric\s+shard(?:s)?/i
+  },
+
+  {
+    unit:
+      'Riftcrystals',
+
     pattern:
       /rift\s*crystal(?:s)?|riftcrystal(?:s)?/i
   },
 
   {
-    unit: 'Origeometry',
+    unit:
+      'Origeometry',
+
     pattern:
       /origeometry/i
   },
 
   {
-    unit: 'Starstones',
+    unit:
+      'Starstones',
+
     pattern:
       /starstone(?:s)?/i
   },
 
+  /*
+   * Zenless Zone Zero
+   */
   {
-    unit: 'Opals',
+    unit:
+      'Monochrome',
+
+    pattern:
+      /monochrome/i
+  },
+
+  {
+    unit:
+      'Opals',
+
     pattern:
       /opal(?:s)?/i
   },
 
   {
-    unit: 'Robux',
+    unit:
+      'Robux',
+
     pattern:
       /robux/i
   },
 
   {
-    unit: 'Diamonds',
+    unit:
+      'Diamonds',
+
     pattern:
       /diamond(?:s)?/i
   },
 
   {
-    unit: 'UC',
+    unit:
+      'UC',
+
     pattern:
       /\buc\b/i
   },
 
   {
-    unit: 'CP',
+    unit:
+      'CP',
+
     pattern:
       /\bcp\b|call\s+of\s+duty\s+points?/i
   },
 
   {
-    unit: 'VP',
+    unit:
+      'VP',
+
     pattern:
       /\bvp\b|valorant\s+points?/i
   },
 
+  /*
+   * Generic Crystals.
+   *
+   * Diletakkan setelah Lunar,
+   * Genesis, Oneiric, Rift, dll
+   * supaya unit yang lebih spesifik
+   * diprioritaskan.
+   */
   {
-    unit: 'Crystals',
+    unit:
+      'Crystals',
+
     pattern:
       /crystal(?:s)?/i
   },
 
   {
-    unit: 'Tokens',
+    unit:
+      'Tokens',
+
     pattern:
       /token(?:s)?/i
   },
 
   {
-    unit: 'Points',
+    unit:
+      'Points',
+
     pattern:
       /point(?:s)?/i
   },
 
   {
-    unit: 'Coins',
+    unit:
+      'Coins',
+
     pattern:
       /coin(?:s)?/i
   },
 
   {
-    unit: 'Vouchers',
+    unit:
+      'Vouchers',
+
     pattern:
       /voucher(?:s)?/i
   }
@@ -197,10 +323,12 @@ const UNIT_PATTERNS = [
 const DIRECT_UNIT_PATTERN = [
   'lunar\\s+crystal(?:s)?',
   'genesis\\s+crystal(?:s)?',
+  'oneiric\\s+shard(?:s)?',
   'rift\\s*crystal(?:s)?',
   'riftcrystal(?:s)?',
   'origeometry',
   'starstone(?:s)?',
+  'monochrome',
   'opal(?:s)?',
   'robux',
   'diamond(?:s)?',
@@ -215,11 +343,14 @@ const DIRECT_UNIT_PATTERN = [
   'voucher(?:s)?'
 ].join('|');
 
-function parseMultiplier(name) {
+function parseMultiplier(
+  name
+) {
   const match =
-    String(name).match(
-      /(?:x|×)\s*(\d+)/i
-    );
+    String(name)
+      .match(
+        /(?:x|×)\s*(\d+)/i
+      );
 
   return match
     ? Math.max(
@@ -231,9 +362,14 @@ function parseMultiplier(name) {
     : 1;
 }
 
-function parseAmounts(name) {
+function parseAmounts(
+  name
+) {
   const value =
-    String(name || '')
+    String(
+      name ||
+      ''
+    )
       .replace(
         /,/g,
         '.'
@@ -336,7 +472,9 @@ function parseAmounts(name) {
   };
 }
 
-function detectUnit(name) {
+function detectUnit(
+  name
+) {
   return (
     UNIT_PATTERNS.find(
       (entry) =>
@@ -513,7 +651,8 @@ function groupOffers(
               a.finalPrice -
                 b.finalPrice ||
               a.storeName.localeCompare(
-                b.storeName
+                b.storeName,
+                'id'
               )
           );
 
