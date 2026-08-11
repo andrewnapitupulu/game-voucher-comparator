@@ -13,13 +13,11 @@ const ENTITY_MAP = {
 
 function decodeEntities(value) {
   return String(value || '')
-    .replace(
-      /&#(\d+);/g,
-      (_, number) => String.fromCodePoint(Number(number))
+    .replace(/&#(\d+);/g, (_, number) =>
+      String.fromCodePoint(Number(number))
     )
-    .replace(
-      /&#x([0-9a-f]+);/gi,
-      (_, number) => String.fromCodePoint(parseInt(number, 16))
+    .replace(/&#x([0-9a-f]+);/gi, (_, number) =>
+      String.fromCodePoint(parseInt(number, 16))
     )
     .replace(
       /&([a-z]+);/gi,
@@ -102,6 +100,35 @@ function countProductAmounts(value) {
   return matches ? matches.length : 0;
 }
 
+/**
+ * Harga seperti:
+ *
+ * Rp74 ribuan
+ * Rp 27 ribu
+ * Rp20rb
+ * Rp20k
+ *
+ * bukan harga exact.
+ *
+ * Karena parseRupiah() bisa membaca
+ * "Rp74 ribuan" sebagai 74,
+ * teks seperti ini harus ditolak
+ * sebelum masuk ke parseRupiah().
+ */
+function isApproximatePriceText(value) {
+  const text = String(value || '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (!text) {
+    return false;
+  }
+
+  return /(?:\bRp\.?|\bIDR\b)\s*\d[\d.,]*\s*(?:ribu(?:an)?|rb|k)\b/i.test(
+    text
+  );
+}
+
 function looksLikeUiInstruction(value) {
   const text = String(value || '')
     .replace(/\s+/g, ' ')
@@ -111,14 +138,13 @@ function looksLikeUiInstruction(value) {
     return false;
   }
 
-  /*
-   * Teks instruksi/CTA tidak boleh dianggap SKU.
-   *
-   * Contoh:
+  /**
+   * Instruksi UI seperti:
    *
    * Pilih Diamond
-   * Pilih Diamond atau Membership Mingguan Free Fire
+   * Pilih Nominal
    * Select Package
+   * Choose Product
    */
   if (
     /^(?:pilih|pilihkan|select|choose|silakan pilih|silahkan pilih|tentukan|masukkan|masukan|isi|klik)\b/i.test(
@@ -128,13 +154,12 @@ function looksLikeUiInstruction(value) {
     return true;
   }
 
-  /*
-   * Contoh bug VCGamers:
+  /**
+   * Contoh:
    *
-   * "Pilih Diamond atau Membership Mingguan Free Fire"
+   * Pilih Diamond atau Membership Mingguan Free Fire
    *
-   * Kalimat seperti ini menjelaskan pilihan kategori,
-   * bukan sebuah produk.
+   * Ini kategori pilihan, bukan SKU.
    */
   if (
     /\b(?:diamond(?:s)?|membership|pass|voucher|uc|vp)\b.{0,40}\batau\b.{0,40}\b(?:diamond(?:s)?|membership|pass|voucher|uc|vp)\b/i.test(
@@ -168,6 +193,28 @@ function looksLikeMarketingSentence(value) {
     return true;
   }
 
+  /**
+   * Contoh:
+   *
+   * Paket 296 Diamond:
+   * Amankan stok Diamond-mu cuma dengan Rp74 ribuan.
+   *
+   * Itu marketing copy, bukan SKU.
+   */
+  if (isApproximatePriceText(text)) {
+    return true;
+  }
+
+  if (
+    /^paket\b/i.test(text) &&
+    /:\s*/.test(text) &&
+    /\b(?:amankan|dapatkan|nikmati|stok|cuma|hanya|hemat|promo|termurah)\b/i.test(
+      text
+    )
+  ) {
+    return true;
+  }
+
   const wordCount =
     text
       .split(/\s+/)
@@ -177,13 +224,12 @@ function looksLikeMarketingSentence(value) {
   const productAmountCount =
     countProductAmounts(text);
 
-  /*
-   * Jika satu kalimat menyebut beberapa nominal,
-   * kemungkinan besar itu artikel/deskripsi.
+  /**
+   * Jika satu kalimat menyebut banyak nominal:
    *
-   * Contoh:
+   * 425 diamonds, 475 diamonds dan 495 diamonds
    *
-   * "425 diamonds, 475 diamonds dan 495 diamonds"
+   * maka kemungkinan besar itu deskripsi.
    */
   if (productAmountCount > 1) {
     return true;
@@ -231,15 +277,11 @@ function isNamedPackage(value) {
     .replace(/\s+/g, ' ')
     .trim();
 
-  /*
-   * Paket tanpa angka harus cocok secara penuh.
-   *
-   * Jangan hanya menggunakan /membership/i,
-   * karena akan salah menangkap teks seperti:
-   *
-   * "Pilih Diamond atau Membership Mingguan Free Fire"
+  /**
+   * Paket tanpa nominal angka
+   * harus cocok sebagai satu nama SKU.
    */
-  return /^(?:(?:mobile legends(?::\s*bang bang)?|mlbb|free fire|pubg mobile|genshin impact|valorant)\s*[-–—:]?\s*)?(?:weekly diamond pass|weekly pass|monthly pass|membership mingguan|weekly membership|monthly membership|starlight(?: membership)?|twilight pass|welkin(?: moon)?|blessing(?: of the welkin moon)?|elite bundle|epic bundle|battle pass)(?:\s*[-–—:]?\s*(?:mobile legends(?::\s*bang bang)?|mlbb|free fire|pubg mobile|genshin impact|valorant))?$/i.test(
+  return /^(?:(?:mobile legends(?::\s*bang bang)?|mobile legend|mobilelegends?|mobilelegend|mlbb|free fire|pubg mobile|genshin impact|valorant)\s*[-–—:]?\s*)?(?:weekly diamond pass(?:\s*[2-9]\s*x)?|weekly pass|monthly pass|membership mingguan|weekly membership|monthly membership|starlight(?: membership)?|starlight member(?: plus)?|twilight pass|welkin(?: moon)?|blessing(?: of the welkin moon)?|elite bundle|epic bundle|battle pass|coupon pass)(?:\s*[-–—:]?\s*(?:mobile legends(?::\s*bang bang)?|mobile legend|mobilelegends?|mobilelegend|mlbb|free fire|pubg mobile|genshin impact|valorant))?$/i.test(
     text
   );
 }
@@ -269,19 +311,21 @@ function isProductName(line) {
     return false;
   }
 
-  /*
-   * Filter paling awal:
-   * teks instruksi UI tidak boleh masuk.
+  /**
+   * Teks instruksi UI harus ditolak.
    */
   if (looksLikeUiInstruction(value)) {
     return false;
   }
 
+  /**
+   * Marketing copy / artikel harus ditolak.
+   */
   if (looksLikeMarketingSentence(value)) {
     return false;
   }
 
-  /*
+  /**
    * Label generik UI.
    */
   if (
@@ -292,8 +336,8 @@ function isProductName(line) {
     return false;
   }
 
-  /*
-   * Angka/harga saja bukan nama produk.
+  /**
+   * Angka atau harga saja bukan SKU.
    */
   if (
     /^(?:rp\.?\s*)?\d[\d.,]*$/i.test(
@@ -303,8 +347,8 @@ function isProductName(line) {
     return false;
   }
 
-  /*
-   * SKU numerik.
+  /**
+   * Produk numerik.
    *
    * Contoh:
    *
@@ -319,9 +363,14 @@ function isProductName(line) {
     return true;
   }
 
-  /*
-   * Paket tanpa nominal angka hanya diterima
-   * bila cocok dengan nama paket yang kita kenal.
+  /**
+   * Produk non-numerik.
+   *
+   * Contoh:
+   *
+   * Weekly Diamond Pass
+   * Starlight Membership
+   * Welkin Moon
    */
   if (isNamedPackage(value)) {
     return true;
@@ -335,9 +384,9 @@ function extractOffersFromLines(
   options = {}
 ) {
   const {
-    /*
-     * Jarak dibuat pendek agar parser
-     * tidak mengambil harga dari card lain.
+    /**
+     * Dibuat pendek agar harga
+     * tidak diambil dari card lain.
      */
     maxDistance = 4,
 
@@ -364,28 +413,44 @@ function extractOffersFromLines(
     let price = null;
     let priceLine = null;
 
+    /**
+     * Paket non-numerik seperti:
+     *
+     * Weekly Diamond Pass
+     *
+     * kadang hanya merupakan heading kategori.
+     *
+     * Karena itu harga hanya boleh:
+     *
+     * - ada pada line yang sama
+     * - atau tepat 1 line setelahnya
+     *
+     * Contoh yang harus ditolak:
+     *
+     * Weekly Diamond Pass
+     * Mobile Legends Cek Username
+     * Rp 83
+     *
+     * Rp83 bukan harga Weekly Diamond Pass.
+     */
+    const priceDistance =
+      isNamedPackage(name)
+        ? 1
+        : maxDistance;
+
     for (
       let cursor = index;
       cursor <= Math.min(
-        index + maxDistance,
+        index + priceDistance,
         lines.length - 1
       );
       cursor += 1
     ) {
       const line = lines[cursor];
 
-      /*
-       * Jangan meminjam harga
-       * dari produk berikutnya.
-       *
-       * Contoh:
-       *
-       * 5 Diamonds
-       * 12 Diamonds
-       * Rp 3.000
-       *
-       * 5 Diamonds tidak boleh
-       * mendapatkan Rp3.000.
+      /**
+       * Kalau sudah menemukan SKU berikutnya,
+       * hentikan pencarian harga.
        */
       if (
         cursor > index &&
@@ -394,7 +459,7 @@ function extractOffersFromLines(
         break;
       }
 
-      /*
+      /**
        * Lewati instruksi UI.
        */
       if (
@@ -404,8 +469,8 @@ function extractOffersFromLines(
         continue;
       }
 
-      /*
-       * Lewati artikel/deskripsi.
+      /**
+       * Lewati marketing copy.
        */
       if (
         cursor > index &&
@@ -414,16 +479,22 @@ function extractOffersFromLines(
         continue;
       }
 
-      /*
-       * Harga HTML hanya diambil jika
-       * mempunyai penanda mata uang.
+      /**
+       * Jangan jadikan:
        *
-       * Contoh:
+       * Rp74 ribuan
+       * Rp20rb
+       * Rp20k
        *
-       * 5 Diamonds Rp 1.000
-       *
-       * harus terbaca Rp1.000,
-       * bukan Rp5.
+       * sebagai harga exact.
+       */
+      if (isApproximatePriceText(line)) {
+        continue;
+      }
+
+      /**
+       * Harga HTML harus memiliki
+       * penanda Rupiah / IDR.
        */
       if (
         /(?:\bIDR\b|\bRp\.?)/i.test(
@@ -507,15 +578,19 @@ function extractJsonScriptOffers(
     'label'
   ];
 
-  /*
-   * "amount" sengaja tidak dimasukkan.
+  /**
+   * "amount" sengaja tidak digunakan
+   * sebagai kandidat field harga.
    *
-   * Banyak API menggunakan:
+   * Contoh:
    *
-   * amount: 5
+   * {
+   *   name: "5 Diamonds",
+   *   amount: 5,
+   *   price: 1000
+   * }
    *
-   * untuk berarti 5 Diamonds,
-   * bukan harga Rp5.
+   * amount berarti jumlah diamond.
    */
   const priceKeys = [
     'price',
@@ -541,7 +616,9 @@ function extractJsonScriptOffers(
     'totalPrice'
   ];
 
-  for (const script of scripts) {
+  for (
+    const script of scripts
+  ) {
     if (
       !/(price|sellingPrice|productName|denomination)/i.test(
         script
@@ -676,6 +753,7 @@ module.exports = {
   sliceLines,
 
   countProductAmounts,
+  isApproximatePriceText,
   looksLikeUiInstruction,
   looksLikeMarketingSentence,
   isNamedPackage,
