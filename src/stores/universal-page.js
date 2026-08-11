@@ -23,11 +23,6 @@ const {
   '../config/games'
 );
 
-/*
- * Template URL umum yang akan dicoba
- * apabila toko tidak mempunyai URL
- * game yang sudah dikonfigurasi.
- */
 const COMMON_TEMPLATES = [
   '{homepage}/{gameSlug}',
   '{homepage}/games/{gameSlug}',
@@ -37,19 +32,8 @@ const COMMON_TEMPLATES = [
   '{homepage}/product/{gameSlug}'
 ];
 
-/*
- * Link seperti login, berita, promo,
- * privacy, dll tidak boleh dianggap
- * sebagai halaman game.
- */
 const BAD_LINK_PATTERN =
   /\b(?:login|register|daftar|masuk|berita|news|article|artikel|blog|promo|promosi|terms|privacy|affiliate|reseller|karir|career|contact|kontak|about|tentang)\b/i;
-
-/*
- * ============================================================
- * URL UTILITIES
- * ============================================================
- */
 
 function absoluteUrl(
   value,
@@ -65,15 +49,11 @@ function absoluteUrl(
         baseUrl
       );
 
-    if (
-      !/^https?:$/.test(
-        url.protocol
-      )
-    ) {
-      return null;
-    }
-
-    return url.toString();
+    return /^https?:$/.test(
+      url.protocol
+    )
+      ? url.toString()
+      : null;
   } catch {
     return null;
   }
@@ -99,12 +79,6 @@ function stripTags(
   );
 }
 
-/*
- * ============================================================
- * LINK DISCOVERY
- * ============================================================
- */
-
 function extractLinks(
   html,
   baseUrl
@@ -129,6 +103,7 @@ function extractLinks(
         match[1] ||
         match[2] ||
         match[3],
+
         baseUrl
       );
 
@@ -149,10 +124,6 @@ function extractLinks(
   return links;
 }
 
-/*
- * Menghapus kandidat duplikat
- * setelah dinormalisasi.
- */
 function uniqueNormalized(
   values
 ) {
@@ -192,17 +163,6 @@ function uniqueNormalized(
   return result;
 }
 
-/*
- * Semua identitas yang bisa digunakan
- * untuk mengenali sebuah game.
- *
- * Contoh Mobile Legends:
- *
- * mobile legends
- * mobile legends bang bang
- * mlbb
- * dsb.
- */
 function gameIdentityCandidates(
   game
 ) {
@@ -216,7 +176,6 @@ function gameIdentityCandidates(
     ),
 
     game?.name,
-
     game?.shortName,
 
     ...(
@@ -226,21 +185,6 @@ function gameIdentityCandidates(
   ]);
 }
 
-/*
- * Alias dianggap strong apabila:
- *
- * - terdiri dari >= 2 kata
- * - atau panjang compact >= 4
- *
- * Ini penting supaya alias sangat
- * pendek seperti:
- *
- * ml
- * ff
- * gi
- *
- * tidak menyebabkan false positive.
- */
 function isStrongIdentity(
   value
 ) {
@@ -277,16 +221,6 @@ function isStrongIdentity(
   );
 }
 
-/*
- * Exact phrase matching berdasarkan
- * token boundary.
- *
- * Tidak sekadar:
- *
- * text.includes("ml")
- *
- * karena itu mudah salah match.
- */
 function containsPhrase(
   haystack,
   phrase
@@ -329,9 +263,7 @@ function countPhrase(
       phrase
     );
 
-  if (
-    !normalizedPhrase
-  ) {
+  if (!normalizedPhrase) {
     return 0;
   }
 
@@ -371,12 +303,6 @@ function countPhrase(
 
   return count;
 }
-
-/*
- * ============================================================
- * HTML SIGNAL EXTRACTION
- * ============================================================
- */
 
 function extractTagTexts(
   html,
@@ -500,12 +426,6 @@ function extractMetaContent(
   return result;
 }
 
-/*
- * ============================================================
- * LINK SCORING
- * ============================================================
- */
-
 function linkScore(
   link,
   game,
@@ -546,10 +466,6 @@ function linkScore(
         identity
       );
 
-    /*
-     * Link text lebih dipercaya
-     * daripada URL.
-     */
     if (
       containsPhrase(
         text,
@@ -568,9 +484,6 @@ function linkScore(
         );
     }
 
-    /*
-     * Match URL.
-     */
     if (
       containsPhrase(
         href,
@@ -589,15 +502,6 @@ function linkScore(
         );
     }
 
-    /*
-     * Support slug compact seperti:
-     *
-     * mobilelegends
-     * callofdutymobile
-     *
-     * tetapi hanya untuk identity
-     * yang cukup kuat.
-     */
     if (strong) {
       const compactText =
         text.replace(
@@ -641,10 +545,6 @@ function linkScore(
     }
   }
 
-  /*
-   * Hindari halaman yang jelas-jelas
-   * bukan halaman game.
-   */
   if (
     BAD_LINK_PATTERN.test(
       `${text} ${href}`
@@ -654,10 +554,6 @@ function linkScore(
       100;
   }
 
-  /*
-   * Prioritaskan link dalam domain
-   * toko yang sama.
-   */
   try {
     if (
       new URL(
@@ -678,21 +574,11 @@ function linkScore(
   return score;
 }
 
-/*
- * ============================================================
- * CANDIDATE URL BUILDER
- * ============================================================
- */
-
 function makeCandidateUrls(
   store,
   game,
   homepageHtml
 ) {
-  /*
-   * URL explicit mempunyai
-   * prioritas tertinggi.
-   */
   const directUrls = [
     store.gameUrls?.[
       game.id
@@ -705,12 +591,8 @@ function makeCandidateUrls(
     Boolean
   );
 
-  /*
-   * Cari link game dari homepage.
-   */
   const discovered =
     homepageHtml
-
       ? extractLinks(
           homepageHtml,
           store.homepage
@@ -729,9 +611,6 @@ function makeCandidateUrls(
             })
           )
 
-          /*
-           * Threshold diperketat.
-           */
           .filter(
             (link) =>
               link.score >=
@@ -739,10 +618,7 @@ function makeCandidateUrls(
           )
 
           .sort(
-            (
-              a,
-              b
-            ) =>
+            (a, b) =>
               b.score -
               a.score
           )
@@ -759,12 +635,6 @@ function makeCandidateUrls(
 
       : [];
 
-  /*
-   * Tebakan URL berdasarkan template.
-   *
-   * Ini merupakan fallback terakhir,
-   * bukan bukti bahwa page benar.
-   */
   const fromTemplates = [
     ...(
       store.urlTemplates ||
@@ -786,10 +656,11 @@ function makeCandidateUrls(
             String(
               store.homepage ||
               ''
-            ).replace(
-              /\/$/,
-              ''
             )
+              .replace(
+                /\/$/,
+                ''
+              )
           )
 
           .replaceAll(
@@ -810,13 +681,6 @@ function makeCandidateUrls(
       Boolean
     );
 
-  /*
-   * Urutan:
-   *
-   * 1. Explicit URL
-   * 2. Discovered URL
-   * 3. Guessed/template URL
-   */
   return [
     ...new Set(
       [
@@ -842,12 +706,6 @@ function makeCandidateUrls(
     10
   );
 }
-
-/*
- * ============================================================
- * PAGE VALIDATION
- * ============================================================
- */
 
 function getPageSignals(
   html
@@ -901,10 +759,6 @@ function getPageSignals(
         ' '
       ),
 
-    /*
-     * Batasi agar tidak perlu
-     * menganalisis HTML sangat besar.
-     */
     bodyText:
       lines
         .slice(
@@ -917,18 +771,6 @@ function getPageSignals(
   };
 }
 
-/*
- * Mengecek apakah final URL ternyata
- * kembali ke homepage.
- *
- * Banyak website memakai soft-404:
- *
- * /honor-of-kings
- *
- * HTTP 200
- *
- * tetapi ternyata homepage.
- */
 function homepageLikeUrl(
   urlValue,
   homepage
@@ -1019,18 +861,6 @@ function shortIdentityMatches(
     );
 }
 
-/*
- * Cek apakah halaman memiliki
- * currency/unit yang sesuai game.
- *
- * Contoh:
- *
- * HOK      -> Tokens
- * Roblox   -> Robux
- * CODM     -> CP
- * CoA      -> Opals
- * Endfield -> Origeometry
- */
 function pageHasTargetUnitEvidence(
   text,
   game
@@ -1041,12 +871,6 @@ function pageHasTargetUnitEvidence(
       []
     );
 
-  if (
-    !unitAliases.length
-  ) {
-    return false;
-  }
-
   return unitAliases.some(
     (unit) =>
       containsPhrase(
@@ -1056,20 +880,6 @@ function pageHasTargetUnitEvidence(
   );
 }
 
-/*
- * Mendeteksi apakah title/H1
- * justru menunjukkan game lain.
- *
- * Contoh user mencari:
- *
- * Honor of Kings
- *
- * tetapi page title:
- *
- * "Mobile Legends Top Up Murah"
- *
- * Maka page langsung ditolak.
- */
 function findCompetingStructuredGame(
   text,
   targetGame
@@ -1114,10 +924,7 @@ function findCompetingStructuredGame(
               .length
         )
         .sort(
-          (
-            a,
-            b
-          ) =>
+          (a, b) =>
             b -
             a
         )[0];
@@ -1140,15 +947,6 @@ function findCompetingStructuredGame(
   return best;
 }
 
-/*
- * Ini merupakan validasi utama.
- *
- * Candidate URL TIDAK langsung
- * dipercaya hanya karena HTTP 200.
- *
- * Page harus membuktikan bahwa
- * memang page game yang dicari.
- */
 function validatePageForGame(
   html,
   finalUrl,
@@ -1165,14 +963,6 @@ function validatePageForGame(
       finalUrl
     );
 
-  /*
-   * Strong identity dari:
-   *
-   * title
-   * H1/H2
-   * meta
-   * URL
-   */
   const titleMatches =
     strongIdentityMatches(
       signals.titleText,
@@ -1197,10 +987,6 @@ function validatePageForGame(
       game
     );
 
-  /*
-   * Alias pendek tidak dijadikan
-   * bukti utama.
-   */
   const shortTitleMatches =
     shortIdentityMatches(
       signals.titleText,
@@ -1221,10 +1007,6 @@ function validatePageForGame(
         isStrongIdentity
       );
 
-  /*
-   * Hitung berapa kali nama game
-   * ditemukan di body.
-   */
   let bodyOccurrences =
     0;
 
@@ -1249,10 +1031,6 @@ function validatePageForGame(
       game
     );
 
-  /*
-   * Cek title/H1 apakah justru
-   * menunjukkan game lain.
-   */
   const competingTitle =
     findCompetingStructuredGame(
       `${signals.titleText} ${signals.headingText}`,
@@ -1335,17 +1113,8 @@ function validatePageForGame(
   }
 
   /*
-   * CASE:
-   *
-   * Search Honor of Kings
-   *
-   * URL:
-   * /honor-of-kings
-   *
-   * tetapi title/H1:
-   * Mobile Legends
-   *
-   * => reject.
+   * Jika title/H1 jelas merupakan
+   * game lain, candidate ditolak.
    */
   if (
     competingTitle &&
@@ -1368,9 +1137,7 @@ function validatePageForGame(
   }
 
   /*
-   * Kalau URL ternyata kembali
-   * ke homepage/katalog umum,
-   * jangan parse produknya.
+   * Soft 404 / redirect ke homepage.
    */
   if (
     homepageLikeUrl(
@@ -1395,22 +1162,6 @@ function validatePageForGame(
     };
   }
 
-  /*
-   * URL yang terlihat benar saja
-   * TIDAK CUKUP.
-   *
-   * Ini inti perbaikan bug.
-   *
-   * Banyak toko memiliki:
-   *
-   * /honor-of-kings
-   *
-   * tetapi mengembalikan homepage
-   * dengan HTTP 200.
-   *
-   * Maka kita tetap membutuhkan
-   * bukti dari CONTENT.
-   */
   const hasStructuredIdentity =
     titleMatches.length >
       0 ||
@@ -1419,14 +1170,6 @@ function validatePageForGame(
     metaMatches.length >
       0;
 
-  /*
-   * Untuk website yang title-nya
-   * generik, masih boleh lolos jika:
-   *
-   * nama game muncul >= 2 kali
-   * DAN
-   * unit/currency game ditemukan.
-   */
   const hasRepeatedBodyIdentity =
     bodyOccurrences >=
       2 &&
@@ -1452,16 +1195,6 @@ function validatePageForGame(
   };
 }
 
-/*
- * ============================================================
- * PRODUCT VALIDATION
- * ============================================================
- */
-
-/*
- * Apakah nama produk secara eksplisit
- * menyebut game tertentu?
- */
 function containsExplicitGameName(
   text,
   game
@@ -1483,20 +1216,6 @@ function containsExplicitGameName(
     );
 }
 
-/*
- * Tolak produk yang secara eksplisit
- * menyebut game lain.
- *
- * Contoh search:
- *
- * Honor of Kings
- *
- * produk hasil parser:
- *
- * Mobile Legends 86 Diamonds
- *
- * => reject.
- */
 function containsOtherGameName(
   text,
   targetGame
@@ -1527,17 +1246,6 @@ function containsOtherGameName(
   return false;
 }
 
-/*
- * Beberapa produk tidak menggunakan
- * nominal currency.
- *
- * Contoh:
- *
- * Weekly Diamond Pass
- * Welkin Moon
- * Starlight Membership
- * Honor Pass
- */
 function namedPackageMatchesGame(
   name,
   game
@@ -1548,7 +1256,7 @@ function namedPackageMatchesGame(
     );
 
   /*
-   * Genshin-specific.
+   * Genshin
    */
   if (
     /\bwelkin\b|blessing of the welkin moon/.test(
@@ -1562,7 +1270,7 @@ function namedPackageMatchesGame(
   }
 
   /*
-   * Mobile Legends-specific.
+   * Mobile Legends
    */
   if (
     /weekly diamond pass|\bwdp\b|starlight|twilight pass/.test(
@@ -1576,7 +1284,7 @@ function namedPackageMatchesGame(
   }
 
   /*
-   * PUBG-specific.
+   * PUBG
    */
   if (
     /royale pass/.test(
@@ -1590,7 +1298,7 @@ function namedPackageMatchesGame(
   }
 
   /*
-   * Honor of Kings-specific.
+   * Honor of Kings
    */
   if (
     /honor pass/.test(
@@ -1604,21 +1312,57 @@ function namedPackageMatchesGame(
   }
 
   /*
-   * Paket generik masih boleh diterima
-   * karena page-nya sendiri sudah
-   * terlebih dahulu tervalidasi.
+   * Honkai: Star Rail
+   */
+  if (
+    /express supply pass/.test(
+      text
+    )
+  ) {
+    return (
+      game.id ===
+      'honkai-star-rail'
+    );
+  }
+
+  /*
+   * Zenless Zone Zero
+   */
+  if (
+    /inter knot membership/.test(
+      text
+    )
+  ) {
+    return (
+      game.id ===
+      'zenless-zone-zero'
+    );
+  }
+
+  /*
+   * Chaos Zero Nightmare
+   */
+  if (
+    /coronomicon monthly(?: package)?|^special data$|^zero data$/.test(
+      text
+    )
+  ) {
+    return (
+      game.id ===
+      'chaos-zero-nightmare'
+    );
+  }
+
+  /*
+   * Paket generik tetap boleh
+   * diterima apabila page sudah
+   * tervalidasi sebagai game target.
    */
   return /\b(?:weekly|monthly|membership|member|battle pass|coupon pass|elite bundle|epic bundle|card)\b/.test(
     text
   );
 }
 
-/*
- * Validasi produk terhadap game.
- *
- * Ini merupakan lapisan kedua setelah
- * page validation.
- */
 function offerMatchesGame(
   offer,
   game
@@ -1635,8 +1379,8 @@ function offerMatchesGame(
   }
 
   /*
-   * Kalau nama produk jelas menyebut
-   * game target, terima.
+   * Nama produk secara eksplisit
+   * menyebut target game.
    */
   if (
     containsExplicitGameName(
@@ -1648,8 +1392,8 @@ function offerMatchesGame(
   }
 
   /*
-   * Kalau nama produk jelas menyebut
-   * game berbeda, reject.
+   * Nama produk secara eksplisit
+   * menyebut game lain.
    */
   if (
     containsOtherGameName(
@@ -1667,22 +1411,8 @@ function offerMatchesGame(
     );
 
   /*
-   * Currency harus cocok dengan
-   * currency game.
-   *
-   * Contoh:
-   *
-   * Honor of Kings:
-   * 80 Tokens        -> PASS
-   * 5 Diamonds       -> REJECT
-   *
-   * Roblox:
-   * 400 Robux        -> PASS
-   * 100 UC           -> REJECT
-   *
-   * COD Mobile:
-   * 80 CP            -> PASS
-   * 86 Diamonds      -> REJECT
+   * Currency produk harus sesuai
+   * currency game target.
    */
   if (
     unitAliases.some(
@@ -1708,25 +1438,11 @@ function offerMatchesGame(
     return true;
   }
 
-  /*
-   * Jika game belum mempunyai
-   * unitAliases, jangan otomatis
-   * membuang semua hasil.
-   *
-   * Tetapi game yang sudah punya
-   * unitAliases harus strict.
-   */
   return (
     unitAliases.length ===
     0
   );
 }
-
-/*
- * ============================================================
- * OFFER PARSER
- * ============================================================
- */
 
 function parseOffers(
   html,
@@ -1751,21 +1467,19 @@ function parseOffers(
       'live'
   };
 
-  /*
-   * maxDistance dikembalikan ke 4.
-   *
-   * Jangan menggunakan 8 karena
-   * berpotensi mengambil harga
-   * dari card/produk berikutnya.
-   */
   const lineOffers =
     extractOffersFromLines(
       htmlToLines(
         html
       ),
+
       {
         ...context,
 
+        /*
+         * Jangan diperbesar kembali
+         * menjadi 8.
+         */
         maxDistance:
           4
       }
@@ -1777,10 +1491,6 @@ function parseOffers(
       context
     );
 
-  /*
-   * Validasi setiap produk lagi
-   * sebelum dikembalikan ke service.
-   */
   return dedupeOffers([
     ...lineOffers,
     ...jsonOffers
@@ -1799,12 +1509,6 @@ function parseOffers(
       150
     );
 }
-
-/*
- * ============================================================
- * UNIVERSAL STORE ADAPTER
- * ============================================================
- */
 
 function createUniversalAdapter(
   store
@@ -1846,14 +1550,11 @@ function createUniversalAdapter(
       let homepageError =
         null;
 
-      /*
-       * Ambil homepage untuk
-       * menemukan link game.
-       */
       try {
         const homepage =
           await fetchText(
             store.homepage,
+
             {
               timeoutMs:
                 Math.min(
@@ -1879,11 +1580,6 @@ function createUniversalAdapter(
           homepageHtml
         );
 
-      /*
-       * Tetap batasi request
-       * per toko agar Vercel
-       * tidak timeout.
-       */
       const maxPages =
         Math.max(
           1,
@@ -1913,6 +1609,7 @@ function createUniversalAdapter(
           const page =
             await fetchText(
               url,
+
               {
                 timeoutMs
               }
@@ -1923,14 +1620,9 @@ function createUniversalAdapter(
             url;
 
           /*
-           * =================================================
-           * FIX UTAMA
-           * =================================================
-           *
-           * Jangan langsung parse harga.
-           *
-           * Pastikan page benar-benar
-           * merupakan game yang dicari.
+           * Candidate page HARUS
+           * tervalidasi sebelum
+           * produknya diparsing.
            */
           const validation =
             validatePageForGame(
@@ -1950,10 +1642,6 @@ function createUniversalAdapter(
             continue;
           }
 
-          /*
-           * Baru setelah page lolos
-           * validasi, parse produknya.
-           */
           const offers =
             parseOffers(
               page.text,
@@ -2008,22 +1696,11 @@ function createUniversalAdapter(
   };
 }
 
-/*
- * ============================================================
- * EXPORT
- * ============================================================
- */
-
 module.exports = {
   createUniversalAdapter,
   extractLinks,
   linkScore,
   makeCandidateUrls,
-
-  /*
-   * Diexport juga supaya mudah
-   * dibuat unit test.
-   */
   validatePageForGame,
   offerMatchesGame
 };
