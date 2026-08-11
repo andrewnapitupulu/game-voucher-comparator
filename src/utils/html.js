@@ -15,9 +15,7 @@ const ENTITY_MAP = {
   nbsp: ' '
 };
 
-function decodeEntities(
-  value
-) {
+function decodeEntities(value) {
   return String(
     value ||
     ''
@@ -217,10 +215,6 @@ function sliceLines(
   );
 }
 
-/*
- * Unit produk yang dikenali
- * universal HTML parser.
- */
 const PRODUCT_UNIT_PATTERN =
   '(?:' +
   'lunar\\s+crystal(?:s)?|' +
@@ -231,6 +225,7 @@ const PRODUCT_UNIT_PATTERN =
   'origeometry|' +
   'starstone(?:s)?|' +
   'monochrome|' +
+  'lunite(?:s)?|' +
   'opal(?:s)?|' +
   'robux|' +
   'diamond(?:s)?|' +
@@ -318,7 +313,7 @@ function looksLikeUiInstruction(
   }
 
   if (
-    /\b(?:diamond(?:s)?|membership|pass|voucher|uc|vp|cp|robux|opal(?:s)?|token(?:s)?|starstone(?:s)?|crystal(?:s)?|oneiric\s+shard(?:s)?|monochrome|origeometry)\b.{0,40}\batau\b.{0,40}\b(?:diamond(?:s)?|membership|pass|voucher|uc|vp|cp|robux|opal(?:s)?|token(?:s)?|starstone(?:s)?|crystal(?:s)?|oneiric\s+shard(?:s)?|monochrome|origeometry)\b/i.test(
+    /\b(?:diamond(?:s)?|membership|pass|voucher|uc|vp|cp|robux|opal(?:s)?|token(?:s)?|starstone(?:s)?|crystal(?:s)?|oneiric\s+shard(?:s)?|monochrome|lunite(?:s)?|origeometry)\b.{0,40}\batau\b.{0,40}\b(?:diamond(?:s)?|membership|pass|voucher|uc|vp|cp|robux|opal(?:s)?|token(?:s)?|starstone(?:s)?|crystal(?:s)?|oneiric\s+shard(?:s)?|monochrome|lunite(?:s)?|origeometry)\b/i.test(
       text
     )
   ) {
@@ -326,7 +321,7 @@ function looksLikeUiInstruction(
   }
 
   if (
-    /\b(?:choose|select)\b.{0,50}\b(?:diamond(?:s)?|membership|pass|voucher|uc|vp|cp|robux|opal(?:s)?|token(?:s)?|starstone(?:s)?|crystal(?:s)?|oneiric\s+shard(?:s)?|monochrome|origeometry)\b/i.test(
+    /\b(?:choose|select)\b.{0,50}\b(?:diamond(?:s)?|membership|pass|voucher|uc|vp|cp|robux|opal(?:s)?|token(?:s)?|starstone(?:s)?|crystal(?:s)?|oneiric\s+shard(?:s)?|monochrome|lunite(?:s)?|origeometry)\b/i.test(
       text
     )
   ) {
@@ -438,7 +433,7 @@ function looksLikeMarketingSentence(
   if (
     wordCount >=
       10 &&
-    /\b(?:bisa|dapat|dapatkan|mendapatkan|nikmati)\b.{0,50}\b(?:diamond(?:s)?|uc|vp|cp|robux|opal(?:s)?|token(?:s)?|starstone(?:s)?|crystal(?:s)?|oneiric\s+shard(?:s)?|monochrome|origeometry)\b/i.test(
+    /\b(?:bisa|dapat|dapatkan|mendapatkan|nikmati)\b.{0,50}\b(?:diamond(?:s)?|uc|vp|cp|robux|opal(?:s)?|token(?:s)?|starstone(?:s)?|crystal(?:s)?|oneiric\s+shard(?:s)?|monochrome|lunite(?:s)?|origeometry)\b/i.test(
       text
     )
   ) {
@@ -462,7 +457,7 @@ function isNamedPackage(
       )
       .trim();
 
-  return /^(?:(?:mobile legends(?::\s*bang bang)?|mobile legend|mobilelegends?|mobilelegend|mlbb|free fire|pubg mobile|genshin impact|valorant|crystal of atlan|honor of kings|call of duty(?::\s*)?mobile|cod mobile|codm|rf online next|ragnarok(?::\s*)?the new world|duet night abyss|roblox|neverness to everness|arknights(?::\s*)?endfield|zenless zone zero|honkai(?::\s*)?star rail|chaos zero nightmare)\s*[-–—:]?\s*)?(?:weekly diamond pass(?:\s*[2-9]\s*x)?|weekly pass|weekly card plus|weekly card|monthly pass|membership mingguan|weekly membership|monthly membership|starlight(?: membership)?|starlight member(?: plus)?|twilight pass|welkin(?: moon)?|blessing(?: of the welkin moon)?|elite bundle|epic bundle|battle pass|honor pass|royale pass|coupon pass|kafra monthly|express supply pass|inter[-\s]*knot membership|coronomicon monthly(?: package)?|special data|zero data)(?:\s*[-–—:]?\s*(?:mobile legends(?::\s*bang bang)?|mobile legend|mobilelegends?|mobilelegend|mlbb|free fire|pubg mobile|genshin impact|valorant|crystal of atlan|honor of kings|call of duty(?::\s*)?mobile|cod mobile|codm|rf online next|ragnarok(?::\s*)?the new world|duet night abyss|roblox|neverness to everness|arknights(?::\s*)?endfield|zenless zone zero|honkai(?::\s*)?star rail|chaos zero nightmare))?$/i.test(
+  return /^(?:(?:mobile legends(?::\s*bang bang)?|mobile legend|mobilelegends?|mobilelegend|mlbb|free fire|pubg mobile|genshin impact|valorant|crystal of atlan|honor of kings|call of duty(?::\s*)?mobile|cod mobile|codm|rf online next|ragnarok(?::\s*)?the new world|duet night abyss|roblox|neverness to everness|arknights(?::\s*)?endfield|zenless zone zero|honkai(?::\s*)?star rail|chaos zero nightmare|wuthering waves)\s*[-–—:]?\s*)?(?:weekly diamond pass(?:\s*[2-9]\s*x)?|weekly pass|weekly card plus|weekly card|monthly pass|membership mingguan|weekly membership|monthly membership|starlight(?: membership)?|starlight member(?: plus)?|twilight pass|welkin(?: moon)?|blessing(?: of the welkin moon)?|elite bundle|epic bundle|battle pass|honor pass|royale pass|coupon pass|kafra monthly|express supply pass|inter[-\s]*knot membership|coronomicon monthly(?: package)?|special data|zero data|lunite subscription)(?:\s*\$?\s*\d+(?:[.,]\d+)?)?(?:\s*[-–—:]?\s*(?:mobile legends(?::\s*bang bang)?|mobile legend|mobilelegends?|mobilelegend|mlbb|free fire|pubg mobile|genshin impact|valorant|crystal of atlan|honor of kings|call of duty(?::\s*)?mobile|cod mobile|codm|rf online next|ragnarok(?::\s*)?the new world|duet night abyss|roblox|neverness to everness|arknights(?::\s*)?endfield|zenless zone zero|honkai(?::\s*)?star rail|chaos zero nightmare|wuthering waves))?$/i.test(
     text
   );
 }
@@ -607,10 +602,6 @@ function extractOffersFromLines(
     let priceLine =
       null;
 
-    /*
-     * Named package hanya boleh
-     * mencari harga satu baris ke depan.
-     */
     const priceDistance =
       isNamedPackage(
         name
@@ -772,8 +763,10 @@ function extractJsonScriptOffers(
   ];
 
   /*
-   * amount sengaja tidak
-   * dijadikan kandidat harga.
+   * amount sengaja tidak dimasukkan.
+   *
+   * amount sering berarti jumlah
+   * currency game, bukan harga.
    */
   const priceKeys = [
     'price',
