@@ -14,7 +14,6 @@ const GAMES = [
       'mole'
     ]
   },
-
   {
     id: 'free-fire',
     name: 'Free Fire',
@@ -26,7 +25,6 @@ const GAMES = [
       'ff'
     ]
   },
-
   {
     id: 'pubg-mobile',
     name: 'PUBG Mobile',
@@ -39,7 +37,6 @@ const GAMES = [
       'uc'
     ]
   },
-
   {
     id: 'genshin-impact',
     name: 'Genshin Impact',
@@ -52,7 +49,6 @@ const GAMES = [
       'welkin'
     ]
   },
-
   {
     id: 'valorant',
     name: 'VALORANT',
@@ -67,8 +63,11 @@ const GAMES = [
 ];
 
 const elements = {
-  form: document.querySelector('#searchForm'),
-  input: document.querySelector('#searchInput'),
+  form:
+    document.querySelector('#searchForm'),
+
+  input:
+    document.querySelector('#searchInput'),
 
   searchButton:
     document.querySelector('#searchButton'),
@@ -541,8 +540,10 @@ function updateSearchProgress(
 
   const percent =
     Math.round(
-      (checked / total) *
-        100
+      (
+        checked /
+        total
+      ) * 100
     );
 
   elements.searchProgress.hidden =
@@ -751,6 +752,7 @@ async function search(query) {
 
             updateSearchProgress(
               state.response,
+
               state.response
                 .checkedStoreCount >=
                 state.response
@@ -899,17 +901,13 @@ function renderResults(data) {
 
   renderProviders(data);
 
-  populateStoreFilter(
-    data
-  );
+  populateStoreFilter(data);
 
-  /**
-   * Ini yang membuat Jenis Paket
-   * berubah setiap hasil pencarian.
+  /*
+   * Filter Jenis Paket selalu
+   * dibentuk ulang dari hasil terbaru.
    */
-  populateTypeFilter(
-    data
-  );
+  populateTypeFilter(data);
 
   renderPackages();
 }
@@ -1117,15 +1115,15 @@ function populateStoreFilter(
       .storeFilter
       .value =
         current;
+  } else {
+    elements
+      .storeFilter
+      .value =
+        'all';
   }
 }
 
-/**
- * Membuat key aman untuk value <option>.
- */
-function normalizeFilterKey(
-  value
-) {
+function normalizeFilterKey(value) {
   return String(value || '')
     .toLowerCase()
     .normalize('NFKD')
@@ -1143,68 +1141,192 @@ function normalizeFilterKey(
     );
 }
 
-/**
- * Mengubah data packageType backend
- * menjadi filter yang tampil ke user.
- *
- * Yang paling penting:
- *
- * packageType === "currency"
- *
- * tidak lagi selalu ditampilkan sebagai:
- *
- * "Currency / nominal"
- *
- * tetapi berdasarkan unit aktual.
- */
-function getPackageFilterMeta(
-  group
-) {
+function detectPackageUnit(group) {
+  /*
+   * Gunakan unit backend apabila
+   * sudah merupakan unit spesifik.
+   */
+  const backendUnit =
+    String(
+      group?.unit || ''
+    )
+      .trim();
+
+  const genericUnits = [
+    '',
+    'item',
+    'currency',
+    'nominal',
+    'lainnya',
+    'other'
+  ];
+
+  if (
+    !genericUnits.includes(
+      backendUnit.toLowerCase()
+    )
+  ) {
+    /*
+     * Normalisasi beberapa variasi.
+     */
+    if (
+      /^diamond(?:s)?$/i.test(
+        backendUnit
+      )
+    ) {
+      return 'Diamonds';
+    }
+
+    if (
+      /^uc$/i.test(
+        backendUnit
+      )
+    ) {
+      return 'UC';
+    }
+
+    if (
+      /^vp$/i.test(
+        backendUnit
+      )
+    ) {
+      return 'Valorant Points (VP)';
+    }
+
+    return backendUnit;
+  }
+
+  /*
+   * Deteksi dari seluruh produk
+   * di dalam group, bukan hanya
+   * offer pertama.
+   */
+  const sample = [
+    group?.name || '',
+
+    ...(group?.offers || [])
+      .map(
+        (offer) =>
+          offer?.originalName || ''
+      )
+  ]
+    .join(' ')
+    .toLowerCase();
+
+  if (
+    /\bdiamond(?:s)?\b/i.test(
+      sample
+    )
+  ) {
+    return 'Diamonds';
+  }
+
+  if (
+    /\buc\b/i.test(
+      sample
+    )
+  ) {
+    return 'UC';
+  }
+
+  if (
+    /\bvp\b|valorant\s+points?/i.test(
+      sample
+    )
+  ) {
+    return 'Valorant Points (VP)';
+  }
+
+  if (
+    /genesis\s+crystal(?:s)?/i.test(
+      sample
+    )
+  ) {
+    return 'Genesis Crystals';
+  }
+
+  if (
+    /\bcrystal(?:s)?\b/i.test(
+      sample
+    )
+  ) {
+    return 'Crystals';
+  }
+
+  if (
+    /\bcoin(?:s)?\b/i.test(
+      sample
+    )
+  ) {
+    return 'Coins';
+  }
+
+  if (
+    /\btoken(?:s)?\b/i.test(
+      sample
+    )
+  ) {
+    return 'Tokens';
+  }
+
+  if (
+    /\bpoint(?:s)?\b/i.test(
+      sample
+    )
+  ) {
+    return 'Points';
+  }
+
+  if (
+    /\bvoucher(?:s)?\b/i.test(
+      sample
+    )
+  ) {
+    return 'Voucher';
+  }
+
+  if (
+    /\bcredit(?:s)?\b/i.test(
+      sample
+    )
+  ) {
+    return 'Credits';
+  }
+
+  if (
+    /\bcp\b/i.test(
+      sample
+    )
+  ) {
+    return 'CP';
+  }
+
+  return 'Nominal';
+}
+
+function getPackageFilterMeta(group) {
   const type =
     String(
       group?.packageType ||
       'other'
-    );
+    )
+      .trim()
+      .toLowerCase();
 
+  /*
+   * Package type currency tidak lagi
+   * ditampilkan sebagai
+   * "Currency / nominal".
+   *
+   * Label mengikuti unit aktual.
+   */
   if (
-    type ===
-    'currency'
+    type === 'currency'
   ) {
     const unit =
-      String(
-        group?.unit ||
-        'Nominal'
-      ).trim() ||
-      'Nominal';
-
-    const unitLabels = {
-      Diamonds:
-        'Diamonds',
-
-      UC:
-        'UC',
-
-      VP:
-        'Valorant Points (VP)',
-
-      'Genesis Crystals':
-        'Genesis Crystals',
-
-      Crystals:
-        'Crystals',
-
-      Points:
-        'Points',
-
-      Coins:
-        'Coins',
-
-      Tokens:
-        'Tokens',
-
-      Voucher:
-        'Voucher'
-    };
+      detectPackageUnit(
+        group
+      );
 
     return {
       key:
@@ -1216,9 +1338,6 @@ function getPackageFilterMeta(
         }`,
 
       label:
-        unitLabels[
-          unit
-        ] ||
         unit,
 
       order:
@@ -1230,7 +1349,6 @@ function getPackageFilterMeta(
     'weekly-pass': {
       label:
         'Weekly Diamond Pass',
-
       order:
         20
     },
@@ -1238,7 +1356,6 @@ function getPackageFilterMeta(
     starlight: {
       label:
         'Starlight Membership',
-
       order:
         30
     },
@@ -1246,7 +1363,6 @@ function getPackageFilterMeta(
     membership: {
       label:
         'Membership',
-
       order:
         40
     },
@@ -1254,7 +1370,6 @@ function getPackageFilterMeta(
     welkin: {
       label:
         'Welkin Moon',
-
       order:
         50
     },
@@ -1262,23 +1377,20 @@ function getPackageFilterMeta(
     twilight: {
       label:
         'Twilight Pass',
-
       order:
         60
     },
 
     'elite-bundle': {
       label:
-        'Weekly Elite Bundle',
-
+        'Elite Bundle',
       order:
         70
     },
 
     'epic-bundle': {
       label:
-        'Monthly Epic Bundle',
-
+        'Epic Bundle',
       order:
         80
     },
@@ -1286,31 +1398,40 @@ function getPackageFilterMeta(
     'battle-pass': {
       label:
         'Battle Pass',
-
       order:
         90
+    },
+
+    'weekly-membership': {
+      label:
+        'Weekly Membership',
+      order:
+        100
+    },
+
+    'monthly-membership': {
+      label:
+        'Monthly Membership',
+      order:
+        110
     },
 
     other: {
       label:
         'Lainnya',
-
       order:
         999
     }
   };
 
-  const meta =
-    specialTypes[
-      type
-    ];
-
-  if (meta) {
+  if (
+    specialTypes[type]
+  ) {
     return {
       key:
         type,
 
-      ...meta
+      ...specialTypes[type]
     };
   }
 
@@ -1319,30 +1440,24 @@ function getPackageFilterMeta(
       type,
 
     label:
-      String(
-        group?.name ||
-        type
-      )
-        .replaceAll(
-          '-',
-          ' '
-        ),
+      String(type)
+        .split('-')
+        .filter(Boolean)
+        .map(
+          (word) =>
+            word.charAt(0)
+              .toUpperCase() +
+            word.slice(1)
+        )
+        .join(' '),
 
     order:
       500
   };
 }
 
-/**
- * INI FUNGSI UTAMA PERBAIKAN.
- *
- * Filter dihapus dan dibangun ulang
- * setiap data pencarian berubah.
- */
-function populateTypeFilter(
-  data
-) {
-  const current =
+function populateTypeFilter(data) {
+  const currentValue =
     elements
       .typeFilter
       .value;
@@ -1350,9 +1465,13 @@ function populateTypeFilter(
   const filters =
     new Map();
 
+  /*
+   * Buat opsi berdasarkan group
+   * yang benar-benar ditemukan.
+   */
   for (
     const group of
-    data.groups
+    data?.groups || []
   ) {
     const meta =
       getPackageFilterMeta(
@@ -1392,21 +1511,28 @@ function populateTypeFilter(
           )
       );
 
-  /**
-   * Selalu reset terlebih dahulu.
+  /*
+   * Hapus seluruh option lama.
    */
   elements
     .typeFilter
-    .replaceChildren(
+    .replaceChildren();
+
+  /*
+   * Default selalu tersedia.
+   */
+  elements
+    .typeFilter
+    .add(
       new Option(
         'Semua paket',
         'all'
       )
     );
 
-  /**
-   * Tambahkan hanya tipe paket
-   * yang benar-benar ditemukan.
+  /*
+   * Tambahkan hanya jenis paket
+   * dari hasil pencarian saat ini.
    */
   for (
     const option of
@@ -1422,27 +1548,21 @@ function populateTypeFilter(
       );
   }
 
-  /**
-   * Kalau pilihan lama masih tersedia,
-   * pertahankan.
-   *
-   * Kalau tidak, reset ke Semua Paket.
+  /*
+   * Pertahankan pilihan jika
+   * masih tersedia.
    */
   if (
-    current === 'all' ||
+    currentValue !== 'all' &&
     filters.has(
-      current
+      currentValue
     )
   ) {
-    elements
-      .typeFilter
-      .value =
-        current;
+    elements.typeFilter.value =
+      currentValue;
   } else {
-    elements
-      .typeFilter
-      .value =
-        'all';
+    elements.typeFilter.value =
+      'all';
   }
 }
 
@@ -1477,8 +1597,7 @@ function getVisibleGroups() {
           ...group,
 
           offers:
-            store ===
-            'all'
+            store === 'all'
               ? group.offers
               : group.offers.filter(
                   (offer) =>
@@ -1490,21 +1609,19 @@ function getVisibleGroups() {
 
       .filter(
         (group) =>
-          group.offers.length >
-          0
+          group.offers.length > 0
       )
 
-      /**
-       * Filter menggunakan key
-       * yang sama dengan option dinamis.
+      /*
+       * Filtering berdasarkan
+       * dynamic package key.
        */
       .filter(
         (group) =>
           type === 'all' ||
           getPackageFilterMeta(
             group
-          ).key ===
-            type
+          ).key === type
       )
 
       .map(
@@ -1716,10 +1833,6 @@ function renderPackages() {
         !group.hasLivePrice
       );
 
-      /**
-       * Subtitle juga menggunakan
-       * label filter dinamis.
-       */
       subtitle.textContent =
         `${group.storeCount} toko tersedia · ${
           getPackageFilterMeta(
@@ -1931,7 +2044,6 @@ function renderOfferRow(
 
   link.insertAdjacentHTML(
     'beforeend',
-
     '<svg viewBox="0 0 24 24" fill="none"><path d="M14 5h5v5M10 14 19 5M19 13v6H5V5h6"/></svg>'
   );
 
@@ -2168,10 +2280,6 @@ elements.refreshButton.addEventListener(
     )
 );
 
-/**
- * Saat Jenis Paket berubah,
- * cukup render ulang hasil lokal.
- */
 elements.typeFilter.addEventListener(
   'change',
   renderPackages
