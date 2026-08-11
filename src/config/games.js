@@ -363,7 +363,7 @@ const GAMES = [
       'endfield',
 
       /*
-       * Typo "Enfield" tetap didukung.
+       * Typo Enfield tetap didukung.
        */
       'arknights enfield',
       'arknights: enfield',
@@ -380,11 +380,6 @@ const GAMES = [
     }
   },
 
-  /*
-   * ======================================================
-   * ZENLESS ZONE ZERO
-   * ======================================================
-   */
   {
     id: 'zenless-zone-zero',
     name: 'Zenless Zone Zero',
@@ -409,11 +404,6 @@ const GAMES = [
     }
   },
 
-  /*
-   * ======================================================
-   * HONKAI STAR RAIL
-   * ======================================================
-   */
   {
     id: 'honkai-star-rail',
     name: 'Honkai: Star Rail',
@@ -439,11 +429,6 @@ const GAMES = [
     }
   },
 
-  /*
-   * ======================================================
-   * CHAOS ZERO NIGHTMARE
-   * ======================================================
-   */
   {
     id: 'chaos-zero-nightmare',
     name: 'Chaos Zero Nightmare',
@@ -466,6 +451,37 @@ const GAMES = [
     stores: {
       lapakgaming:
         'https://www.lapakgaming.com/id-id/chaos-zero-nightmare-login'
+    }
+  },
+
+  /*
+   * ======================================================
+   * WUTHERING WAVES
+   * ======================================================
+   */
+  {
+    id: 'wuthering-waves',
+    name: 'Wuthering Waves',
+    shortName: 'Wuthering Waves',
+    publisher: 'Kuro Games',
+    icon: 'WW',
+    aliases: [
+      'wuthering waves',
+      'wuthering wave',
+      'wuthering',
+      'wuwa',
+      'ww',
+      'lunite',
+      'lunites',
+      'lunite subscription'
+    ],
+    unitAliases: [
+      'lunite',
+      'lunites'
+    ],
+    stores: {
+      lapakgaming:
+        'https://www.lapakgaming.com/id-id/wuthering-waves'
     }
   }
 ];
@@ -605,6 +621,7 @@ function findLocalGame(query) {
       .map(
         (game) => ({
           game,
+
           score:
             scoreGame(
               game,
