@@ -54,12 +54,11 @@ function envBoolean(
     return fallback;
   }
 
-  return (
-    String(
-      value
-    ).toLowerCase() ===
-    'true'
-  );
+  return String(
+    value
+  )
+    .toLowerCase() ===
+    'true';
 }
 
 function boundedNumber(
@@ -89,12 +88,6 @@ function boundedNumber(
     )
   );
 }
-
-/*
- * ======================================================
- * GAME RESOLVER
- * ======================================================
- */
 
 async function resolveGame(
   query
@@ -163,27 +156,6 @@ async function resolveGame(
   };
 }
 
-/*
- * ======================================================
- * CONCURRENCY CONTROL
- * ======================================================
- *
- * Sebelumnya semua toko dalam satu
- * batch menggunakan Promise.allSettled.
- *
- * Misalnya:
- *
- * 8 toko
- * × beberapa request per adapter
- * × beberapa batch frontend
- *
- * dapat menghasilkan burst request
- * yang cukup besar.
- *
- * Sekarang request per API invocation
- * dibatasi concurrency-nya.
- */
-
 async function allSettledWithConcurrency(
   items,
   concurrency,
@@ -194,7 +166,8 @@ async function allSettledWithConcurrency(
       items.length
     );
 
-  let cursor = 0;
+  let cursor =
+    0;
 
   async function worker() {
     while (
@@ -273,33 +246,24 @@ async function allSettledWithConcurrency(
   return results;
 }
 
-/*
- * ======================================================
- * PROVIDER ERROR CLASSIFICATION
- * ======================================================
- */
-
 function classifyProviderFailure(
   error
 ) {
   const message =
     String(
-      error?.message ||
+      error
+        ?.message ||
       'Gagal mengambil harga'
     );
 
   const code =
     String(
-      error?.code ||
+      error
+        ?.code ||
       ''
     )
       .toUpperCase();
 
-  /*
-   * Untuk compatibility dengan adapter
-   * lama yang hanya menghasilkan
-   * string "HTTP 403".
-   */
   const statusMatch =
     message.match(
       /HTTP\s+(\d{3})/i
@@ -308,7 +272,8 @@ function classifyProviderFailure(
   const httpStatus =
     Number.isFinite(
       Number(
-        error?.status
+        error
+          ?.status
       )
     )
       ? Number(
@@ -325,24 +290,20 @@ function classifyProviderFailure(
         );
 
   /*
-   * ----------------------------------------------------
+   * ======================================================
    * ACCESS BLOCKED
-   * ----------------------------------------------------
+   * ======================================================
    */
 
   if (
     code ===
       'ACCESS_BLOCKED' ||
-
     httpStatus ===
       401 ||
-
     httpStatus ===
       403 ||
-
     httpStatus ===
       451 ||
-
     /\bforbidden\b/i.test(
       message
     )
@@ -366,18 +327,16 @@ function classifyProviderFailure(
   }
 
   /*
-   * ----------------------------------------------------
+   * ======================================================
    * RATE LIMITED
-   * ----------------------------------------------------
+   * ======================================================
    */
 
   if (
     code ===
       'RATE_LIMITED' ||
-
     httpStatus ===
       429 ||
-
     /too many requests|rate.?limit/i.test(
       message
     )
@@ -399,15 +358,14 @@ function classifyProviderFailure(
   }
 
   /*
-   * ----------------------------------------------------
+   * ======================================================
    * TIMEOUT
-   * ----------------------------------------------------
+   * ======================================================
    */
 
   if (
     code ===
       'TIMEOUT' ||
-
     /timeout/i.test(
       message
     )
@@ -427,27 +385,14 @@ function classifyProviderFailure(
   }
 
   /*
-   * ----------------------------------------------------
-   * GAME PAGE NOT VERIFIED
-   * ----------------------------------------------------
-   *
-   * PENTING:
-   *
-   * Ini harus dicek SEBELUM
-   * generic "kandidat belum
-   * menghasilkan harga".
-   *
-   * Universal adapter biasanya
-   * membungkus error seperti:
-   *
-   * Kandidat toko belum menghasilkan harga
-   * (halaman tidak cocok: ...)
+   * ======================================================
+   * PAGE NOT VERIFIED
+   * ======================================================
    */
 
   if (
     code ===
       'PAGE_NOT_VERIFIED' ||
-
     /halaman tidak cocok|konten halaman tidak cukup membuktikan|homepage\/katalog umum|halaman terdeteksi sebagai/i.test(
       message
     )
@@ -467,43 +412,93 @@ function classifyProviderFailure(
   }
 
   /*
-   * ----------------------------------------------------
+   * ======================================================
    * PARSER FAILED
-   * ----------------------------------------------------
+   * ======================================================
    */
 
   if (
     code ===
       'PARSER_FAILED' ||
-
-    /halaman game cocok, tetapi harga\/produk|harga tidak ditemukan pada halaman publik|harga\/produk tidak terbaca|feed tidak mengembalikan produk|belum menghasilkan harga/i.test(
+    /halaman game cocok, tetapi harga\/produk|harga tidak ditemukan pada halaman publik|harga\/produk tidak terbaca|feed tidak mengembalikan produk|belum menghasilkan harga|struktur halaman belum didukung|konten produk kemungkinan dimuat/i.test(
       message
     )
   ) {
+    const detailCode =
+      String(
+        error
+          ?.parserReason ||
+        'UNSUPPORTED_STRUCTURE'
+      )
+        .toUpperCase();
+
+    const detailMessages = {
+      JS_RENDERED_CONTENT:
+        'Konten produk kemungkinan dimuat melalui JavaScript/API setelah halaman dibuka',
+
+      PRODUCT_FOUND_NO_PRICE:
+        'Nama produk ditemukan, tetapi harga tidak tersedia pada HTML server',
+
+      PRICE_FOUND_NO_PRODUCT:
+        'Harga ditemukan, tetapi nama produk belum dapat dikenali',
+
+      JSON_DATA_FOUND_NO_MATCH:
+        'Data JSON ditemukan, tetapi struktur produk/harganya belum dikenali',
+
+      HTML_NO_PRODUCT:
+        'Tidak ada kandidat produk yang dikenali pada HTML server',
+
+      PRODUCTS_REJECTED_BY_GAME_VALIDATION:
+        'Produk berhasil dibaca, tetapi tidak lolos validasi game target',
+
+      PARTIAL_MATCH_ONLY:
+        'Sebagian data berhasil dibaca, tetapi belum menghasilkan offer yang dapat digunakan',
+
+      UNSUPPORTED_STRUCTURE:
+        'Struktur halaman belum didukung parser saat ini'
+    };
+
     return {
       statusCode:
         'PARSER_FAILED',
 
+      /*
+       * Detail internal yang sangat
+       * berguna untuk debugging.
+       */
+      detailCode,
+
       httpStatus,
 
+      /*
+       * JS_RENDERED_CONTENT berpotensi
+       * berubah jika suatu saat kita
+       * punya adapter/API khusus.
+       */
       retryable:
-        false,
+        detailCode ===
+        'JS_RENDERED_CONTENT',
 
       message:
-        'PARSER FAILED · Halaman ditemukan, tetapi produk/harga belum dapat diekstrak dari respons server'
+        `PARSER FAILED · ${
+          detailMessages[
+            detailCode
+          ] ||
+          detailMessages
+            .UNSUPPORTED_STRUCTURE
+        }`
     };
   }
 
   /*
-   * ----------------------------------------------------
+   * ======================================================
    * NOT CONFIGURED
-   * ----------------------------------------------------
+   * ======================================================
    */
 
   if (
     code ===
       'NOT_CONFIGURED' ||
-
     /url toko belum dikonfigurasi|url feed belum diatur/i.test(
       message
     )
@@ -523,18 +518,16 @@ function classifyProviderFailure(
   }
 
   /*
-   * ----------------------------------------------------
+   * ======================================================
    * PAGE NOT FOUND
-   * ----------------------------------------------------
+   * ======================================================
    */
 
   if (
     code ===
       'PAGE_NOT_FOUND' ||
-
     httpStatus ===
       404 ||
-
     httpStatus ===
       410
   ) {
@@ -556,19 +549,17 @@ function classifyProviderFailure(
   }
 
   /*
-   * ----------------------------------------------------
-   * SERVER TOKO ERROR
-   * ----------------------------------------------------
+   * ======================================================
+   * UPSTREAM ERROR
+   * ======================================================
    */
 
   if (
     code ===
       'UPSTREAM_ERROR' ||
-
     (
       httpStatus !==
         null &&
-
       httpStatus >=
         500
     )
@@ -592,15 +583,14 @@ function classifyProviderFailure(
   }
 
   /*
-   * ----------------------------------------------------
+   * ======================================================
    * NETWORK ERROR
-   * ----------------------------------------------------
+   * ======================================================
    */
 
   if (
     code ===
       'NETWORK_ERROR' ||
-
     /fetch failed|network|econn|enotfound|getaddrinfo|socket/i.test(
       message
     )
@@ -619,12 +609,6 @@ function classifyProviderFailure(
     };
   }
 
-  /*
-   * ----------------------------------------------------
-   * UNKNOWN
-   * ----------------------------------------------------
-   */
-
   return {
     statusCode:
       'UNKNOWN_ERROR',
@@ -638,17 +622,6 @@ function classifyProviderFailure(
       `ERROR · ${message}`
   };
 }
-
-/*
- * API juga mengirim summary supaya
- * ke depan dashboard/debug panel
- * dapat menampilkan:
- *
- * LIVE: 20
- * ACCESS_BLOCKED: 5
- * PARSER_FAILED: 10
- * dst.
- */
 
 function summarizeProviders(
   providerStatus
@@ -683,12 +656,6 @@ function summarizeProviders(
   );
 }
 
-/*
- * ======================================================
- * SEARCH
- * ======================================================
- */
-
 async function searchPrices(
   query,
   options = {}
@@ -696,9 +663,6 @@ async function searchPrices(
   const startedAt =
     Date.now();
 
-  /*
-   * Timeout per toko.
-   */
   const timeoutMs =
     boundedNumber(
       process.env
@@ -711,17 +675,6 @@ async function searchPrices(
       10000
     );
 
-  /*
-   * Default hanya 3 store adapter
-   * aktif bersamaan dalam satu
-   * invocation.
-   *
-   * Bisa diubah melalui:
-   *
-   * STORE_CONCURRENCY=2
-   * STORE_CONCURRENCY=3
-   * STORE_CONCURRENCY=4
-   */
   const storeConcurrency =
     boundedNumber(
       process.env
@@ -737,7 +690,6 @@ async function searchPrices(
   const allowFallback =
     envBoolean(
       'ALLOW_DEMO_FALLBACK',
-
       false
     );
 
@@ -805,16 +757,6 @@ async function searchPrices(
       storeIds
     });
 
-  /*
-   * Sebelumnya:
-   *
-   * Promise.allSettled(
-   *   adapters.map(...)
-   * )
-   *
-   * Sekarang request dibatasi
-   * concurrency-nya.
-   */
   const results =
     await allSettledWithConcurrency(
       adapters,
@@ -829,7 +771,6 @@ async function searchPrices(
         offers:
           await adapter.fetchOffers(
             game,
-
             {
               timeoutMs
             }
@@ -875,18 +816,14 @@ async function searchPrices(
             'feed'
         };
 
-        /*
-         * =================================================
-         * SUCCESS
-         * =================================================
-         */
-
         if (
           result.status ===
           'fulfilled'
         ) {
           liveOffers.push(
-            ...result.value.offers
+            ...result
+              .value
+              .offers
           );
 
           return {
@@ -908,18 +845,15 @@ async function searchPrices(
               false,
 
             count:
-              result.value.offers.length,
+              result
+                .value
+                .offers
+                .length,
 
             message:
               `${result.value.offers.length} harga live ditemukan`
           };
         }
-
-        /*
-         * =================================================
-         * FAILED
-         * =================================================
-         */
 
         const failure =
           classifyProviderFailure(
@@ -942,12 +876,6 @@ async function searchPrices(
         };
       }
     );
-
-  /*
-   * ======================================================
-   * FALLBACK
-   * ======================================================
-   */
 
   let offers =
     liveOffers;
@@ -1010,12 +938,6 @@ async function searchPrices(
     }
   }
 
-  /*
-   * ======================================================
-   * NORMALIZE
-   * ======================================================
-   */
-
   const groups =
     groupOffers(
       offers
@@ -1032,12 +954,6 @@ async function searchPrices(
       ? null
       : offset +
         adapters.length;
-
-  /*
-   * ======================================================
-   * RESPONSE
-   * ======================================================
-   */
 
   return {
     ok:
@@ -1101,9 +1017,6 @@ async function searchPrices(
 
     totalStoreCount,
 
-    /*
-     * Berguna untuk debugging.
-     */
     storeConcurrency,
 
     batch: {
@@ -1122,16 +1035,6 @@ async function searchPrices(
 
     providerStatus,
 
-    /*
-     * Contoh:
-     *
-     * {
-     *   LIVE: 4,
-     *   ACCESS_BLOCKED: 2,
-     *   PARSER_FAILED: 1,
-     *   PAGE_NOT_VERIFIED: 1
-     * }
-     */
     providerSummary:
       summarizeProviders(
         providerStatus
@@ -1140,7 +1043,7 @@ async function searchPrices(
     groups,
 
     notice:
-      'Harga diambil real-time per batch tanpa database dan cache. Status toko membedakan akses diblokir, rate limit, timeout, page tidak terverifikasi, dan parser gagal. Biaya admin, promo bersyarat, dan harga checkout dapat berbeda.'
+      'Harga diambil real-time per batch tanpa database dan cache. Parser mencoba HTML, embedded JSON, JSON-LD, Next.js/Nuxt state, lalu memberikan diagnostic reason jika produk masih belum dapat diekstrak.'
   };
 }
 
