@@ -33,22 +33,10 @@ function htmlToLines(html, { keepScripts = false } = {}) {
 
   if (!keepScripts) {
     value = value
-      .replace(
-        /<script\b[^>]*>[\s\S]*?<\/script>/gi,
-        ' '
-      )
-      .replace(
-        /<style\b[^>]*>[\s\S]*?<\/style>/gi,
-        ' '
-      )
-      .replace(
-        /<noscript\b[^>]*>[\s\S]*?<\/noscript>/gi,
-        ' '
-      )
-      .replace(
-        /<svg\b[^>]*>[\s\S]*?<\/svg>/gi,
-        ' '
-      );
+      .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, ' ')
+      .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, ' ')
+      .replace(/<noscript\b[^>]*>[\s\S]*?<\/noscript>/gi, ' ')
+      .replace(/<svg\b[^>]*>[\s\S]*?<\/svg>/gi, ' ');
   }
 
   return decodeEntities(
@@ -60,17 +48,11 @@ function htmlToLines(html, { keepScripts = false } = {}) {
       .replace(/<[^>]+>/g, ' ')
   )
     .split(/\r?\n/)
-    .map((line) =>
-      line.replace(/\s+/g, ' ').trim()
-    )
+    .map((line) => line.replace(/\s+/g, ' ').trim())
     .filter(Boolean);
 }
 
-function sliceLines(
-  lines,
-  startPatterns = [],
-  endPatterns = []
-) {
+function sliceLines(lines, startPatterns = [], endPatterns = []) {
   const starts = startPatterns.map((pattern) =>
     pattern instanceof RegExp
       ? pattern
@@ -85,16 +67,8 @@ function sliceLines(
 
   let start = 0;
 
-  for (
-    let index = 0;
-    index < lines.length;
-    index += 1
-  ) {
-    if (
-      starts.some((pattern) =>
-        pattern.test(lines[index])
-      )
-    ) {
+  for (let index = 0; index < lines.length; index += 1) {
+    if (starts.some((pattern) => pattern.test(lines[index]))) {
       start = index + 1;
       break;
     }
@@ -102,16 +76,8 @@ function sliceLines(
 
   let end = lines.length;
 
-  for (
-    let index = start;
-    index < lines.length;
-    index += 1
-  ) {
-    if (
-      ends.some((pattern) =>
-        pattern.test(lines[index])
-      )
-    ) {
+  for (let index = start; index < lines.length; index += 1) {
+    if (ends.some((pattern) => pattern.test(lines[index]))) {
       end = index;
       break;
     }
@@ -120,49 +86,75 @@ function sliceLines(
   return lines.slice(start, end);
 }
 
-/**
- * Menghitung berapa banyak nominal produk
- * yang muncul dalam satu teks.
- *
- * Contoh:
- *
- * "5 Diamonds"
- * -> 1
- *
- * "425 diamonds, 475 diamonds dan 495 diamonds"
- * -> 3
- *
- * "78 + 8 Diamonds"
- * -> 1
- */
+const PRODUCT_UNIT_PATTERN =
+  '(?:diamond(?:s)?|uc|vp|point(?:s)?|genesis\\s+crystal(?:s)?|crystal(?:s)?|token(?:s)?|voucher(?:s)?|shell(?:s)?|coin(?:s)?|credit(?:s)?|cp)';
+
 function countProductAmounts(value) {
   const text = String(value || '');
 
   const matches = text.match(
-    /\b\d[\d.,]*\s*(?:bonus\s*)?(?:diamond(?:s)?|uc|vp|point(?:s)?|genesis\s+crystal(?:s)?|crystal(?:s)?|token(?:s)?|voucher(?:s)?|shell(?:s)?|coin(?:s)?|credit(?:s)?|cp)\b/gi
+    new RegExp(
+      `\\b\\d[\\d.,]*\\s*(?:bonus\\s*)?${PRODUCT_UNIT_PATTERN}\\b`,
+      'gi'
+    )
   );
 
-  return matches
-    ? matches.length
-    : 0;
+  return matches ? matches.length : 0;
 }
 
-/**
- * Mendeteksi kalimat artikel, deskripsi,
- * atau promosi yang kebetulan mengandung
- * nominal diamond/UC/dll.
- *
- * Contoh yang harus ditolak:
- *
- * "Untuk top up 50 ribuan kamu bisa mendapatkan
- * 425 diamonds, 475 diamonds dan 495 diamonds."
- *
- * Tetapi:
- *
- * "5 Diamond Termurah, Harga Rp 848"
- *
- * tetap boleh dianggap sebagai produk.
- */
+function looksLikeUiInstruction(value) {
+  const text = String(value || '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (!text) {
+    return false;
+  }
+
+  /*
+   * Teks instruksi/CTA tidak boleh dianggap SKU.
+   *
+   * Contoh:
+   *
+   * Pilih Diamond
+   * Pilih Diamond atau Membership Mingguan Free Fire
+   * Select Package
+   */
+  if (
+    /^(?:pilih|pilihkan|select|choose|silakan pilih|silahkan pilih|tentukan|masukkan|masukan|isi|klik)\b/i.test(
+      text
+    )
+  ) {
+    return true;
+  }
+
+  /*
+   * Contoh bug VCGamers:
+   *
+   * "Pilih Diamond atau Membership Mingguan Free Fire"
+   *
+   * Kalimat seperti ini menjelaskan pilihan kategori,
+   * bukan sebuah produk.
+   */
+  if (
+    /\b(?:diamond(?:s)?|membership|pass|voucher|uc|vp)\b.{0,40}\batau\b.{0,40}\b(?:diamond(?:s)?|membership|pass|voucher|uc|vp)\b/i.test(
+      text
+    )
+  ) {
+    return true;
+  }
+
+  if (
+    /\b(?:choose|select)\b.{0,50}\b(?:diamond(?:s)?|membership|pass|voucher|uc|vp)\b/i.test(
+      text
+    )
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
 function looksLikeMarketingSentence(value) {
   const text = String(value || '')
     .replace(/\s+/g, ' ')
@@ -170,6 +162,10 @@ function looksLikeMarketingSentence(value) {
 
   if (!text) {
     return false;
+  }
+
+  if (looksLikeUiInstruction(text)) {
+    return true;
   }
 
   const wordCount =
@@ -182,19 +178,17 @@ function looksLikeMarketingSentence(value) {
     countProductAmounts(text);
 
   /*
-   * Jika satu kalimat menyebut beberapa
-   * nominal produk sekaligus, hampir pasti
-   * itu artikel/deskripsi dan bukan satu SKU.
+   * Jika satu kalimat menyebut beberapa nominal,
+   * kemungkinan besar itu artikel/deskripsi.
+   *
+   * Contoh:
+   *
+   * "425 diamonds, 475 diamonds dan 495 diamonds"
    */
   if (productAmountCount > 1) {
     return true;
   }
 
-  /*
-   * Kalimat sangat panjang yang mengandung
-   * nominal produk kemungkinan besar merupakan
-   * deskripsi.
-   */
   if (
     wordCount > 18 &&
     productAmountCount >= 1
@@ -202,15 +196,6 @@ function looksLikeMarketingSentence(value) {
     return true;
   }
 
-  /*
-   * Pola kalimat natural/promosi.
-   *
-   * Diberi batas minimal jumlah kata agar:
-   *
-   * "5 Diamond Termurah, Harga Rp 848"
-   *
-   * tidak ikut ditolak.
-   */
   if (
     wordCount >= 8 &&
     /^(?:untuk\b|kamu\b|anda\b|dengan\b|jika\b|kalau\b|cukup\b|mulai\b|top\s*up\s+\d)/i.test(
@@ -241,6 +226,37 @@ function looksLikeMarketingSentence(value) {
   return false;
 }
 
+function isNamedPackage(value) {
+  const text = String(value || '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  /*
+   * Paket tanpa angka harus cocok secara penuh.
+   *
+   * Jangan hanya menggunakan /membership/i,
+   * karena akan salah menangkap teks seperti:
+   *
+   * "Pilih Diamond atau Membership Mingguan Free Fire"
+   */
+  return /^(?:(?:mobile legends(?::\s*bang bang)?|mlbb|free fire|pubg mobile|genshin impact|valorant)\s*[-–—:]?\s*)?(?:weekly diamond pass|weekly pass|monthly pass|membership mingguan|weekly membership|monthly membership|starlight(?: membership)?|twilight pass|welkin(?: moon)?|blessing(?: of the welkin moon)?|elite bundle|epic bundle|battle pass)(?:\s*[-–—:]?\s*(?:mobile legends(?::\s*bang bang)?|mlbb|free fire|pubg mobile|genshin impact|valorant))?$/i.test(
+    text
+  );
+}
+
+function hasNumericProduct(value) {
+  const text = String(value || '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  const amountPattern = new RegExp(
+    `\\d[\\d.,]*(?:\\s*\\+\\s*\\d[\\d.,]*)?\\s*(?:bonus\\s*)?${PRODUCT_UNIT_PATTERN}\\b`,
+    'i'
+  );
+
+  return amountPattern.test(text);
+}
+
 function isProductName(line) {
   const value = String(line || '')
     .replace(/\s+/g, ' ')
@@ -254,19 +270,22 @@ function isProductName(line) {
   }
 
   /*
-   * Filter utama untuk bug VCGamers.
+   * Filter paling awal:
+   * teks instruksi UI tidak boleh masuk.
    */
-  if (
-    looksLikeMarketingSentence(value)
-  ) {
+  if (looksLikeUiInstruction(value)) {
+    return false;
+  }
+
+  if (looksLikeMarketingSentence(value)) {
     return false;
   }
 
   /*
-   * Label UI / teks generik.
+   * Label generik UI.
    */
   if (
-    /^(?:image:|dari$|best seller$|promo$|diskon$|pilih$|harga$|nominal$|deskripsi$|detail$|lihat semua$)/i.test(
+    /^(?:image:|dari$|best seller$|promo$|diskon$|pilih$|harga$|nominal$|deskripsi$|detail$|lihat semua$|pilih nominal$|pilih produk$|pilih diamond$)/i.test(
       value
     )
   ) {
@@ -274,7 +293,7 @@ function isProductName(line) {
   }
 
   /*
-   * Angka atau harga saja bukan produk.
+   * Angka/harga saja bukan nama produk.
    */
   if (
     /^(?:rp\.?\s*)?\d[\d.,]*$/i.test(
@@ -285,23 +304,30 @@ function isProductName(line) {
   }
 
   /*
-   * Nama produk harus mengandung
-   * nominal produk atau paket khusus.
+   * SKU numerik.
    *
-   * Contoh valid:
+   * Contoh:
    *
    * 5 Diamonds
    * 86 Diamonds
-   * 720 UC
-   * 475 VP
    * 78 + 8 Diamonds
+   * 720 UC
    * Mobile Legends 86 Diamonds
    * 5 Diamond Termurah, Harga Rp 848
-   * Weekly Diamond Pass
    */
-  return /(?:\d[\d.,]*\s*(?:bonus\s*)?(?:diamond(?:s)?|uc|vp|point(?:s)?|genesis\s+crystal(?:s)?|crystal(?:s)?|token(?:s)?|voucher(?:s)?|shell(?:s)?|coin(?:s)?|credit(?:s)?|cp)|weekly\s+diamond\s+pass|welkin|blessing|starlight|twilight|elite\s+bundle|epic\s+bundle|battle\s+pass|membership|monthly\s+pass|weekly\s+pass)/i.test(
-    value
-  );
+  if (hasNumericProduct(value)) {
+    return true;
+  }
+
+  /*
+   * Paket tanpa nominal angka hanya diterima
+   * bila cocok dengan nama paket yang kita kenal.
+   */
+  if (isNamedPackage(value)) {
+    return true;
+  }
+
+  return false;
 }
 
 function extractOffersFromLines(
@@ -310,11 +336,8 @@ function extractOffersFromLines(
 ) {
   const {
     /*
-     * Sebelumnya 8 baris.
-     *
-     * Itu terlalu jauh untuk parser universal
-     * dan berisiko mengambil harga dari
-     * card produk lain.
+     * Jarak dibuat pendek agar parser
+     * tidak mengambil harga dari card lain.
      */
     maxDistance = 4,
 
@@ -352,7 +375,7 @@ function extractOffersFromLines(
       const line = lines[cursor];
 
       /*
-       * Jangan pernah meminjam harga
+       * Jangan meminjam harga
        * dari produk berikutnya.
        *
        * Contoh:
@@ -362,7 +385,7 @@ function extractOffersFromLines(
        * Rp 3.000
        *
        * 5 Diamonds tidak boleh
-       * mendapatkan harga Rp3.000.
+       * mendapatkan Rp3.000.
        */
       if (
         cursor > index &&
@@ -372,8 +395,17 @@ function extractOffersFromLines(
       }
 
       /*
-       * Abaikan teks artikel/promosi
-       * yang berada di antara elemen.
+       * Lewati instruksi UI.
+       */
+      if (
+        cursor > index &&
+        looksLikeUiInstruction(line)
+      ) {
+        continue;
+      }
+
+      /*
+       * Lewati artikel/deskripsi.
        */
       if (
         cursor > index &&
@@ -383,15 +415,14 @@ function extractOffersFromLines(
       }
 
       /*
-       * Harga dari HTML hanya diproses
-       * jika mempunyai marker Rupiah.
+       * Harga HTML hanya diambil jika
+       * mempunyai penanda mata uang.
        *
        * Contoh:
        *
-       * "5 Diamonds Rp 1.000"
+       * 5 Diamonds Rp 1.000
        *
-       * -> Rp1.000
-       *
+       * harus terbaca Rp1.000,
        * bukan Rp5.
        */
       if (
@@ -477,9 +508,9 @@ function extractJsonScriptOffers(
   ];
 
   /*
-   * "amount" sengaja TIDAK masuk.
+   * "amount" sengaja tidak dimasukkan.
    *
-   * Karena banyak API menggunakan:
+   * Banyak API menggunakan:
    *
    * amount: 5
    *
@@ -510,9 +541,7 @@ function extractJsonScriptOffers(
     'totalPrice'
   ];
 
-  for (
-    const script of scripts
-  ) {
+  for (const script of scripts) {
     if (
       !/(price|sellingPrice|productName|denomination)/i.test(
         script
@@ -630,9 +659,7 @@ function dedupeOffers(offers) {
           .replace(/\s+/g, ' ')}` +
         `|${offer.productPrice}`;
 
-      if (
-        seen.has(key)
-      ) {
+      if (seen.has(key)) {
         return false;
       }
 
@@ -649,7 +676,9 @@ module.exports = {
   sliceLines,
 
   countProductAmounts,
+  looksLikeUiInstruction,
   looksLikeMarketingSentence,
+  isNamedPackage,
 
   isProductName,
   extractOffersFromLines,
