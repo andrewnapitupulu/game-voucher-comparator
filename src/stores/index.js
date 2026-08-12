@@ -21,14 +21,11 @@ const duniagames =
   );
 
 /*
- * Dedicated adapters untuk toko yang membutuhkan
- * parser khusus.
+ * Dedicated adapters.
  *
- * File adapter ini sudah ada di repository:
- *
- * - gigames.js
- * - oura-store.js
- * - kios-game-indonesia.js
+ * Ketiga adapter ini sudah mempunyai file masing-masing,
+ * tetapi harus diregistrasikan di sini supaya benar-benar
+ * masuk ke strategy chain.
  */
 const gigames =
   require(
@@ -77,14 +74,16 @@ const {
 );
 
 /*
+ * Marker untuk memastikan deployment
+ * benar-benar menggunakan registry terbaru.
+ */
+const ADAPTER_REGISTRY_VERSION =
+  '2026-08-12-dedicated-v2';
+
+/*
  * ============================================================
  * DEDICATED ADAPTER REGISTRY
  * ============================================================
- *
- * Sebelum perubahan ini Gigames, Oura Store, dan
- * Kios Game Indonesia mempunyai file dedicated adapter,
- * tetapi tidak terdaftar di registry sehingga adapter
- * tersebut tidak pernah dipanggil.
  */
 const DEDICATED = {
   codashop,
@@ -92,6 +91,9 @@ const DEDICATED = {
   lapakgaming,
   duniagames,
 
+  /*
+   * Dedicated adapters baru.
+   */
   gigames,
 
   'oura-store':
@@ -162,8 +164,6 @@ function buildStoreAdapter(
    * ========================================================
    * PUBLIC API
    * ========================================================
-   *
-   * Hanya aktif jika store.publicApi memang dikonfigurasi.
    */
   if (
     isPublicApiConfigured(
@@ -199,8 +199,7 @@ function buildStoreAdapter(
    * UNIVERSAL
    * ========================================================
    *
-   * Tetap menjadi fallback kecuali secara eksplisit
-   * dinonaktifkan.
+   * Tetap menjadi fallback jika dedicated gagal.
    */
   if (
     store.disableUniversal !==
@@ -233,8 +232,8 @@ function buildStoreAdapter(
   /*
    * Compatibility guard.
    *
-   * Kalau accessStrategies typo atau tidak cocok,
-   * jangan membuat toko hilang seluruhnya.
+   * Kalau accessStrategies salah konfigurasi,
+   * universal tetap dipakai selama tidak disabled.
    */
   if (
     !strategies.length
@@ -255,16 +254,26 @@ function buildStoreAdapter(
     }
   }
 
-  return createMultiStrategyAdapter(
-    store,
-    strategies
-  );
+  const adapter =
+    createMultiStrategyAdapter(
+      store,
+      strategies
+    );
+
+  /*
+   * Version marker untuk debugging.
+   */
+  adapter.adapterRegistryVersion =
+    ADAPTER_REGISTRY_VERSION;
+
+  return adapter;
 }
 
 function buildRegistryAdapters() {
   const publicAdaptersEnabled =
     String(
-      process.env.ENABLE_PUBLIC_PAGE_ADAPTERS ||
+      process.env
+        .ENABLE_PUBLIC_PAGE_ADAPTERS ||
       'true'
     )
       .toLowerCase() !==
@@ -368,6 +377,7 @@ function getStoreAdapterCount() {
 }
 
 module.exports = {
+  ADAPTER_REGISTRY_VERSION,
   getStoreAdapters,
   getStoreAdapterCount,
   buildRegistryAdapters,
