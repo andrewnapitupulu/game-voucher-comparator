@@ -55,9 +55,7 @@ function envBoolean(
   }
 
   return (
-    String(
-      value
-    )
+    String(value)
       .toLowerCase() ===
     'true'
   );
@@ -70,20 +68,15 @@ function boundedNumber(
   max
 ) {
   const parsed =
-    Number(
-      value
-    );
+    Number(value);
 
   const resolved =
-    Number.isFinite(
-      parsed
-    )
+    Number.isFinite(parsed)
       ? parsed
       : fallback;
 
   return Math.max(
     min,
-
     Math.min(
       max,
       resolved
@@ -116,9 +109,7 @@ async function resolveGame(
   }
 
   const local =
-    findLocalGame(
-      query
-    );
+    findLocalGame(query);
 
   if (
     local
@@ -189,25 +180,19 @@ async function allSettledWithConcurrency(
       }
 
       try {
-        const value =
-          await task(
-            items[
-              index
-            ],
-            index
-          );
-
         results[
           index
         ] = {
           status:
             'fulfilled',
 
-          value
+          value:
+            await task(
+              items[index],
+              index
+            )
         };
-      } catch (
-        reason
-      ) {
+      } catch (reason) {
         results[
           index
         ] = {
@@ -258,11 +243,8 @@ function resolveHttpStatus(
     );
 
   if (
-    Number.isFinite(
-      direct
-    ) &&
-    direct >
-      0
+    Number.isFinite(direct) &&
+    direct > 0
   ) {
     return direct;
   }
@@ -278,9 +260,7 @@ function resolveHttpStatus(
 
   return match
     ? Number(
-        match[
-          1
-        ]
+        match[1]
       )
     : null;
 }
@@ -308,19 +288,70 @@ function classifyProviderFailure(
     );
 
   /*
-   * ======================================================
-   * ACCESS BLOCKED
-   * ======================================================
+   * PENTING:
+   *
+   * CANDIDATE_BLOCKED dan
+   * DISCOVERY_BLOCKED harus diperiksa
+   * sebelum generic HTTP 403.
    */
+
+  if (
+    code ===
+    'CANDIDATE_BLOCKED'
+  ) {
+    return {
+      statusCode:
+        'CANDIDATE_BLOCKED',
+
+      detailCode:
+        'CANDIDATE_BLOCKED',
+
+      httpStatus:
+        httpStatus ||
+        403,
+
+      retryable:
+        false,
+
+      message:
+        'CANDIDATE BLOCKED · Hanya URL tebakan yang ditolak; ini belum membuktikan seluruh toko memblokir akses'
+    };
+  }
+
+  if (
+    code ===
+    'DISCOVERY_BLOCKED'
+  ) {
+    return {
+      statusCode:
+        'DISCOVERY_BLOCKED',
+
+      detailCode:
+        'DISCOVERY_BLOCKED',
+
+      httpStatus:
+        httpStatus ||
+        403,
+
+      retryable:
+        false,
+
+      message:
+        'DISCOVERY BLOCKED · Homepage/sumber discovery ditolak, tetapi belum membuktikan halaman produk ikut diblokir'
+    };
+  }
+
   if (
     code ===
       'ACCESS_BLOCKED' ||
-    httpStatus ===
-      401 ||
-    httpStatus ===
-      403 ||
-    httpStatus ===
-      451 ||
+    [
+      401,
+      403,
+      451
+    ]
+      .includes(
+        httpStatus
+      ) ||
     /\bforbidden\b/i.test(
       message
     )
@@ -339,19 +370,10 @@ function classifyProviderFailure(
         false,
 
       message:
-        `ACCESS BLOCKED · ${
-          httpStatus
-            ? `HTTP ${httpStatus} dari server toko`
-            : 'server toko menolak request server-side'
-        }`
+        `ACCESS BLOCKED · URL game ber-confidence tinggi mengembalikan HTTP ${httpStatus || 403}`
     };
   }
 
-  /*
-   * ======================================================
-   * RATE LIMITED
-   * ======================================================
-   */
   if (
     code ===
       'RATE_LIMITED' ||
@@ -380,11 +402,6 @@ function classifyProviderFailure(
     };
   }
 
-  /*
-   * ======================================================
-   * DNS ERROR
-   * ======================================================
-   */
   if (
     code ===
       'NETWORK_DNS_ERROR' ||
@@ -409,11 +426,6 @@ function classifyProviderFailure(
     };
   }
 
-  /*
-   * ======================================================
-   * TLS ERROR
-   * ======================================================
-   */
   if (
     code ===
       'NETWORK_TLS_ERROR' ||
@@ -438,11 +450,6 @@ function classifyProviderFailure(
     };
   }
 
-  /*
-   * ======================================================
-   * CONNECTION RESET / REFUSED
-   * ======================================================
-   */
   if (
     code ===
       'NETWORK_CONNECTION_ERROR' ||
@@ -467,11 +474,6 @@ function classifyProviderFailure(
     };
   }
 
-  /*
-   * ======================================================
-   * CONNECTION TIMEOUT
-   * ======================================================
-   */
   if (
     code ===
       'NETWORK_CONNECT_TIMEOUT' ||
@@ -496,11 +498,6 @@ function classifyProviderFailure(
     };
   }
 
-  /*
-   * ======================================================
-   * REQUEST TIMEOUT
-   * ======================================================
-   */
   if (
     code ===
       'TIMEOUT' ||
@@ -525,11 +522,6 @@ function classifyProviderFailure(
     };
   }
 
-  /*
-   * ======================================================
-   * GAME PAGE NOT VERIFIED
-   * ======================================================
-   */
   if (
     code ===
       'PAGE_NOT_VERIFIED' ||
@@ -554,15 +546,10 @@ function classifyProviderFailure(
     };
   }
 
-  /*
-   * ======================================================
-   * PARSER FAILED
-   * ======================================================
-   */
   if (
     code ===
       'PARSER_FAILED' ||
-    /halaman game cocok, tetapi harga\/produk|harga tidak ditemukan pada halaman publik|harga\/produk tidak terbaca|feed tidak mengembalikan produk|belum menghasilkan harga|struktur halaman belum didukung|konten produk kemungkinan dimuat/i.test(
+    /harga\/produk|harga tidak ditemukan|feed tidak mengembalikan produk|struktur halaman belum didukung|konten produk kemungkinan dimuat|produk berhasil dibaca/i.test(
       message
     )
   ) {
@@ -608,8 +595,7 @@ function classifyProviderFailure(
       httpStatus,
 
       retryable:
-        detailCode ===
-        'JS_RENDERED_CONTENT',
+        false,
 
       message:
         `PARSER FAILED · ${
@@ -622,11 +608,6 @@ function classifyProviderFailure(
     };
   }
 
-  /*
-   * ======================================================
-   * NOT CONFIGURED
-   * ======================================================
-   */
   if (
     code ===
       'NOT_CONFIGURED' ||
@@ -651,26 +632,16 @@ function classifyProviderFailure(
     };
   }
 
-  /*
-   * ======================================================
-   * PAGE NOT FOUND
-   * ======================================================
-   *
-   * Wording sengaja diubah.
-   *
-   * Ini tidak berarti website toko
-   * tidak memiliki produk.
-   *
-   * Hanya candidate URL yang dicoba
-   * oleh sistem menghasilkan 404/410.
-   */
   if (
     code ===
       'PAGE_NOT_FOUND' ||
-    httpStatus ===
-      404 ||
-    httpStatus ===
+    [
+      404,
       410
+    ]
+      .includes(
+        httpStatus
+      )
   ) {
     return {
       statusCode:
@@ -685,18 +656,10 @@ function classifyProviderFailure(
         false,
 
       message:
-        `PAGE NOT FOUND · Candidate URL yang dicoba mengembalikan HTTP ${
-          httpStatus ||
-          404
-        }`
+        `PAGE NOT FOUND · Candidate URL yang dicoba mengembalikan HTTP ${httpStatus || 404}`
     };
   }
 
-  /*
-   * ======================================================
-   * UPSTREAM ERROR
-   * ======================================================
-   */
   if (
     code ===
       'UPSTREAM_ERROR' ||
@@ -729,11 +692,6 @@ function classifyProviderFailure(
     };
   }
 
-  /*
-   * ======================================================
-   * GENERIC FETCH ERROR
-   * ======================================================
-   */
   if (
     code ===
       'NETWORK_FETCH_FAILED' ||
@@ -754,7 +712,7 @@ function classifyProviderFailure(
         true,
 
       message:
-        'NETWORK ERROR · Request server-side ke toko gagal setelah retry'
+        'NETWORK ERROR · Request server-side ke toko gagal setelah retry yang diizinkan'
     };
   }
 
@@ -829,19 +787,19 @@ async function searchPrices(
     );
 
   /*
-   * Maksimum toko yang diproses
-   * bersamaan pada satu API request.
+   * Diturunkan dari 3 menjadi 2
+   * untuk mengurangi burst request.
    */
   const storeConcurrency =
     boundedNumber(
       process.env
         .STORE_CONCURRENCY,
 
-      3,
+      2,
 
       1,
 
-      8
+      6
     );
 
   const allowFallback =
@@ -853,7 +811,6 @@ async function searchPrices(
   const offset =
     Math.max(
       0,
-
       Number(
         options.offset
       ) ||
@@ -863,10 +820,8 @@ async function searchPrices(
   const limit =
     Math.max(
       1,
-
       Math.min(
         20,
-
         Number(
           options.limit
         ) ||
@@ -889,9 +844,7 @@ async function searchPrices(
       query
     );
 
-  if (
-    !game
-  ) {
+  if (!game) {
     return {
       ok:
         false,
@@ -914,10 +867,6 @@ async function searchPrices(
       storeIds
     });
 
-  /*
-   * Adapter toko tidak ditembak
-   * semuanya secara bersamaan.
-   */
   const results =
     await allSettledWithConcurrency(
       adapters,
@@ -948,9 +897,7 @@ async function searchPrices(
         index
       ) => {
         const adapter =
-          adapters[
-            index
-          ];
+          adapters[index];
 
         const registry =
           STORE_BY_ID[
@@ -1018,11 +965,6 @@ async function searchPrices(
           };
         }
 
-        const failure =
-          classifyProviderFailure(
-            result.reason
-          );
-
         return {
           ...common,
 
@@ -1035,7 +977,9 @@ async function searchPrices(
           count:
             0,
 
-          ...failure
+          ...classifyProviderFailure(
+            result.reason
+          )
         };
       }
     );
@@ -1106,12 +1050,6 @@ async function searchPrices(
       offers
     );
 
-  const cheapestOverall =
-    groups[
-      0
-    ] ||
-    null;
-
   const nextOffset =
     storeIds.length
       ? null
@@ -1179,7 +1117,6 @@ async function searchPrices(
       adapters.length,
 
     totalStoreCount,
-
     storeConcurrency,
 
     batch: {
@@ -1194,7 +1131,9 @@ async function searchPrices(
           totalStoreCount
     },
 
-    cheapestOverall,
+    cheapestOverall:
+      groups[0] ||
+      null,
 
     providerStatus,
 
@@ -1206,7 +1145,7 @@ async function searchPrices(
     groups,
 
     notice:
-      'Harga diambil real-time per batch tanpa database dan cache. URL game dicari dari direct URL, homepage, candidate slug, dan sitemap; error jaringan transient dicoba ulang satu kali.'
+      'Harga diambil real-time. Direct/discovered/sitemap URL diprioritaskan, guessed URL dibatasi, dan 403 dari URL tebakan tidak lagi dianggap otomatis sebagai ACCESS BLOCKED.'
   };
 }
 
