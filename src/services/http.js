@@ -3,7 +3,6 @@
 class HttpError extends Error {
   constructor(message, details = {}) {
     super(message);
-
     this.name = 'HttpError';
     this.code = details.code || 'HTTP_ERROR';
     this.status = details.status ?? null;
@@ -19,65 +18,28 @@ class HttpError extends Error {
 }
 
 function codeFromStatus(status) {
-  if (
-    status === 401 ||
-    status === 403 ||
-    status === 451
-  ) {
-    return 'ACCESS_BLOCKED';
-  }
-
-  if (
-    status === 404 ||
-    status === 410
-  ) {
-    return 'PAGE_NOT_FOUND';
-  }
-
-  if (
-    status === 408 ||
-    status === 504
-  ) {
-    return 'TIMEOUT';
-  }
-
-  if (status === 429) {
-    return 'RATE_LIMITED';
-  }
-
-  if (status >= 500) {
-    return 'UPSTREAM_ERROR';
-  }
-
+  if ([401, 403, 451].includes(status)) return 'ACCESS_BLOCKED';
+  if ([404, 410].includes(status)) return 'PAGE_NOT_FOUND';
+  if ([408, 504].includes(status)) return 'TIMEOUT';
+  if (status === 429) return 'RATE_LIMITED';
+  if (status >= 500) return 'UPSTREAM_ERROR';
   return 'HTTP_ERROR';
 }
 
 function networkCodeFromError(error) {
-  const rawCode = String(
-    error?.cause?.code ||
-    error?.code ||
-    ''
-  ).toUpperCase();
-
-  const message = String(
-    error?.cause?.message ||
-    error?.message ||
-    ''
-  ).toLowerCase();
+  const rawCode = String(error?.cause?.code || error?.code || '').toUpperCase();
+  const message = String(error?.cause?.message || error?.message || '').toLowerCase();
 
   if (
     rawCode === 'ENOTFOUND' ||
     rawCode === 'EAI_AGAIN' ||
-    /getaddrinfo|dns/.test(message)
+    /getaddrinfo|\bdns\b/.test(message)
   ) {
     return 'NETWORK_DNS_ERROR';
   }
 
   if (
-    rawCode === 'ECONNRESET' ||
-    rawCode === 'ECONNREFUSED' ||
-    rawCode === 'EPIPE' ||
-    rawCode === 'UND_ERR_SOCKET' ||
+    ['ECONNRESET', 'ECONNREFUSED', 'EPIPE', 'UND_ERR_SOCKET'].includes(rawCode) ||
     /connection reset|socket|econnreset|econnrefused/.test(message)
   ) {
     return 'NETWORK_CONNECTION_ERROR';
@@ -88,7 +50,7 @@ function networkCodeFromError(error) {
     rawCode.startsWith('ERR_TLS_') ||
     rawCode === 'UNABLE_TO_VERIFY_LEAF_SIGNATURE' ||
     rawCode === 'DEPTH_ZERO_SELF_SIGNED_CERT' ||
-    /certificate|tls|ssl/.test(message)
+    /certificate|\btls\b|\bssl\b/.test(message)
   ) {
     return 'NETWORK_TLS_ERROR';
   }
@@ -105,154 +67,88 @@ function networkCodeFromError(error) {
 }
 
 function isRetryableError(error) {
-  const code = String(
-    error?.code ||
-    ''
-  ).toUpperCase();
-
-  const status = Number(
-    error?.status
-  );
+  const code = String(error?.code || '').toUpperCase();
+  const status = Number(error?.status);
 
   if (
-    code === 'NETWORK_DNS_ERROR' ||
-    code === 'NETWORK_CONNECTION_ERROR' ||
-    code === 'NETWORK_CONNECT_TIMEOUT' ||
-    code === 'NETWORK_FETCH_FAILED' ||
-    code === 'TIMEOUT' ||
-    code === 'RATE_LIMITED'
+    [
+      'NETWORK_DNS_ERROR',
+      'NETWORK_CONNECTION_ERROR',
+      'NETWORK_CONNECT_TIMEOUT',
+      'NETWORK_FETCH_FAILED',
+      'TIMEOUT',
+      'RATE_LIMITED'
+    ].includes(code)
   ) {
     return true;
   }
 
-  return (
-    status === 502 ||
-    status === 503 ||
-    status === 504
-  );
-}
-
-function retryDelay(
-  error,
-  baseDelayMs
-) {
-  const retryAfter = Number(
-    error?.retryAfter
-  );
-
-  if (
-    Number.isFinite(
-      retryAfter
-    ) &&
-    retryAfter > 0
-  ) {
-    return Math.min(
-      1500,
-      retryAfter * 1000
-    );
-  }
-
-  return Math.max(
-    100,
-    Math.min(
-      1000,
-      Number(baseDelayMs) || 300
-    )
-  );
+  return [502, 503, 504].includes(status);
 }
 
 function sleep(ms) {
-  return new Promise(
-    (resolve) =>
-      setTimeout(
-        resolve,
-        ms
-      )
-  );
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function fetchOnce(
-  url,
-  {
-    timeoutMs,
-    headers,
-    attempt
-  }
-) {
-  const controller =
-    new AbortController();
+function retryDelay(error, baseDelayMs) {
+  const retryAfter = Number(error?.retryAfter);
 
-  const timeout =
-    setTimeout(
-      () =>
-        controller.abort(),
-      timeoutMs
-    );
+  if (Number.isFinite(retryAfter) && retryAfter > 0) {
+    return Math.min(1500, retryAfter * 1000);
+  }
+
+  return Math.max(150, Math.min(750, Number(baseDelayMs) || 350));
+}
+
+async function fetchOnce(url, { timeoutMs, headers, attempt }) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
-    const response =
-      await fetch(
-        url,
-        {
-          redirect:
-            'follow',
+    const response = await fetch(url, {
+      redirect: 'follow',
+      signal: controller.signal,
+      headers: {
+        // Identitas request dibuat eksplisit; tidak menyamarkan request sebagai browser pengguna.
+        'user-agent':
+          process.env.OUTBOUND_USER_AGENT ||
+          'TopUpScout/1.0',
 
-          signal:
-            controller.signal,
+        accept:
+          'text/html,application/xhtml+xml,application/json;q=0.9,application/xml;q=0.8,text/xml;q=0.8,*/*;q=0.7',
 
-          headers: {
-            'user-agent':
-              'Mozilla/5.0 (compatible; GamePriceComparator/1.0; +https://vercel.app)',
+        'accept-language':
+          'id-ID,id;q=0.9,en;q=0.7',
 
-            accept:
-              'text/html,application/xhtml+xml,application/json;q=0.9,application/xml;q=0.8,text/xml;q=0.8,*/*;q=0.7',
-
-            'accept-language':
-              'id-ID,id;q=0.9,en;q=0.7',
-
-            ...headers
-          }
-        }
-      );
+        ...headers
+      }
+    });
 
     const contentType =
-      response.headers.get(
-        'content-type'
-      ) ||
-      '';
+      response.headers.get('content-type') || '';
 
     const finalUrl =
       response.url ||
-      String(
-        url
-      );
+      String(url);
 
-    if (
-      !response.ok
-    ) {
+    if (!response.ok) {
       throw new HttpError(
         `HTTP ${response.status}`,
         {
           code:
-            codeFromStatus(
-              response.status
-            ),
+            codeFromStatus(response.status),
 
           status:
             response.status,
 
           url:
-            String(
-              url
-            ),
+            String(url),
 
           finalUrl,
           contentType,
 
           retryAfter:
-            response.headers.get(
-              'retry-after'
-            ),
+            response.headers.get('retry-after'),
 
           attempts:
             attempt
@@ -260,11 +156,10 @@ async function fetchOnce(
       );
     }
 
-    const text =
-      await response.text();
-
     return {
-      text,
+      text:
+        await response.text(),
+
       contentType,
       finalUrl,
 
@@ -274,20 +169,12 @@ async function fetchOnce(
       attempts:
         attempt
     };
-  } catch (
-    error
-  ) {
-    if (
-      error instanceof
-      HttpError
-    ) {
+  } catch (error) {
+    if (error instanceof HttpError) {
       throw error;
     }
 
-    if (
-      error?.name ===
-      'AbortError'
-    ) {
+    if (error?.name === 'AbortError') {
       throw new HttpError(
         `Timeout setelah ${timeoutMs} ms`,
         {
@@ -295,9 +182,7 @@ async function fetchOnce(
             'TIMEOUT',
 
           url:
-            String(
-              url
-            ),
+            String(url),
 
           timeoutMs,
           attempts:
@@ -309,17 +194,14 @@ async function fetchOnce(
       );
     }
 
-    const networkCode =
-      networkCodeFromError(
-        error
-      );
+    const code =
+      networkCodeFromError(error);
 
     throw new HttpError(
       error?.message ||
       'Gagal menghubungi server toko',
       {
-        code:
-          networkCode,
+        code,
 
         networkCode:
           String(
@@ -329,9 +211,7 @@ async function fetchOnce(
           ),
 
         url:
-          String(
-            url
-          ),
+          String(url),
 
         attempts:
           attempt,
@@ -341,9 +221,7 @@ async function fetchOnce(
       }
     );
   } finally {
-    clearTimeout(
-      timeout
-    );
+    clearTimeout(timeout);
   }
 }
 
@@ -353,18 +231,21 @@ async function fetchText(
     timeoutMs = 6500,
     headers = {},
     retries = 1,
-    retryDelayMs = 300
+    retryDelayMs = 350
   } = {}
 ) {
+  /*
+   * Hard limit satu retry.
+   *
+   * Homepage, sitemap, dan guessed URL
+   * akan mengirim retries: 0.
+   */
   const safeRetries =
     Math.max(
       0,
       Math.min(
-        2,
-        Number(
-          retries
-        ) ||
-        0
+        1,
+        Number(retries) || 0
       )
     );
 
@@ -373,8 +254,7 @@ async function fetchText(
 
   for (
     let attempt = 1;
-    attempt <=
-    safeRetries + 1;
+    attempt <= safeRetries + 1;
     attempt += 1
   ) {
     try {
@@ -386,18 +266,13 @@ async function fetchText(
           attempt
         }
       );
-    } catch (
-      error
-    ) {
+    } catch (error) {
       lastError =
         error;
 
       if (
-        attempt >
-          safeRetries ||
-        !isRetryableError(
-          error
-        )
+        attempt > safeRetries ||
+        !isRetryableError(error)
       ) {
         throw error;
       }
