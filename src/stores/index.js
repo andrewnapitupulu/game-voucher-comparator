@@ -33,6 +33,19 @@ const {
 );
 
 const {
+  createPublicApiAdapter,
+  isPublicApiConfigured
+} = require(
+  './public-api'
+);
+
+const {
+  createMultiStrategyAdapter
+} = require(
+  './multi-strategy'
+);
+
+const {
   listStores
 } = require(
   '../config/stores'
@@ -45,91 +58,166 @@ const DEDICATED = {
   duniagames
 };
 
-function makeRegistryAdapter(
+function normalizeStrategyList(
+  store,
+  available
+) {
+  const requested =
+    Array.isArray(
+      store.accessStrategies
+    )
+      ? store.accessStrategies
+      : [
+          'public-api',
+          'dedicated',
+          'universal'
+        ];
+
+  const seen =
+    new Set();
+
+  return requested
+    .map(
+      (value) =>
+        String(
+          value ||
+          ''
+        )
+          .trim()
+          .toLowerCase()
+    )
+    .filter(Boolean)
+    .filter(
+      (value) => {
+        if (
+          seen.has(
+            value
+          ) ||
+          !available[
+            value
+          ]
+        ) {
+          return false;
+        }
+
+        seen.add(
+          value
+        );
+
+        return true;
+      }
+    );
+}
+
+function buildStoreAdapter(
   store
 ) {
-  const dedicated =
+  const available =
+    {};
+
+  /*
+   * PUBLIC API
+   *
+   * Hanya aktif jika store.publicApi
+   * memang dikonfigurasi.
+   */
+  if (
+    isPublicApiConfigured(
+      store
+    )
+  ) {
+    available[
+      'public-api'
+    ] =
+      createPublicApiAdapter(
+        store
+      );
+  }
+
+  /*
+   * DEDICATED
+   */
+  if (
     DEDICATED[
       store.id
-    ];
+    ]
+  ) {
+    available.dedicated =
+      DEDICATED[
+        store.id
+      ];
+  }
 
-  const universal =
-    createUniversalAdapter(
-      store
+  /*
+   * UNIVERSAL
+   *
+   * Tetap menjadi fallback kecuali
+   * secara eksplisit dinonaktifkan.
+   */
+  if (
+    store.disableUniversal !==
+    true
+  ) {
+    available.universal =
+      createUniversalAdapter(
+        store
+      );
+  }
+
+  const strategyIds =
+    normalizeStrategyList(
+      store,
+      available
+    );
+
+  const strategies =
+    strategyIds.map(
+      (id) => ({
+        id,
+
+        adapter:
+          available[
+            id
+          ]
+      })
     );
 
   /*
-   * Jika toko tidak mempunyai
-   * parser khusus, gunakan universal
-   * parser seperti biasa.
+   * Compatibility guard.
+   *
+   * Kalau accessStrategies typo atau
+   * tidak cocok, jangan membuat toko
+   * hilang seluruhnya.
    */
-  if (!dedicated) {
-    return universal;
+  if (
+    !strategies.length
+  ) {
+    if (
+      store.disableUniversal !==
+      true
+    ) {
+      strategies.push({
+        id:
+          'universal',
+
+        adapter:
+          createUniversalAdapter(
+            store
+          )
+      });
+    }
   }
 
-  return {
-    id:
-      store.id,
-
-    name:
-      store.name,
-
-    category:
-      store.category,
-
-    verification:
-      store.verification,
-
-    async fetchOffers(
-      game,
-      options
-    ) {
-      /*
-       * Jika game mempunyai URL khusus
-       * untuk toko ini, gunakan parser
-       * dedicated.
-       *
-       * Contoh:
-       *
-       * Mobile Legends + Codashop
-       * Mobile Legends + Lapakgaming
-       */
-      if (
-        game?.stores?.[
-          store.id
-        ]
-      ) {
-        return dedicated.fetchOffers(
-          game,
-          options
-        );
-      }
-
-      /*
-       * Untuk game baru yang belum
-       * mempunyai URL dedicated di toko,
-       * jangan langsung return kosong.
-       *
-       * Universal adapter akan:
-       *
-       * 1. membuka homepage toko
-       * 2. mencari link game
-       * 3. mencoba slug game umum
-       * 4. parsing halaman produk
-       */
-      return universal.fetchOffers(
-        game,
-        options
-      );
-    }
-  };
+  return createMultiStrategyAdapter(
+    store,
+    strategies
+  );
 }
 
 function buildRegistryAdapters() {
   const publicAdaptersEnabled =
     String(
-      process.env
-        .ENABLE_PUBLIC_PAGE_ADAPTERS ||
+      process.env.ENABLE_PUBLIC_PAGE_ADAPTERS ||
       'true'
     )
       .toLowerCase() !==
@@ -143,7 +231,7 @@ function buildRegistryAdapters() {
 
   return listStores()
     .map(
-      makeRegistryAdapter
+      buildStoreAdapter
     );
 }
 
@@ -155,9 +243,6 @@ function selectAdapters(
     storeIds = []
   } = {}
 ) {
-  /*
-   * Jika user/API meminta toko tertentu.
-   */
   if (
     storeIds.length
   ) {
@@ -177,15 +262,13 @@ function selectAdapters(
   const safeOffset =
     Math.max(
       0,
-      Number(offset) ||
+
+      Number(
+        offset
+      ) ||
       0
     );
 
-  /*
-   * Maksimal 20 toko per API request
-   * supaya serverless request tidak
-   * terlalu berat.
-   */
   const safeLimit =
     Math.max(
       1,
@@ -193,15 +276,18 @@ function selectAdapters(
       Math.min(
         20,
 
-        Number(limit) ||
+        Number(
+          limit
+        ) ||
         8
       )
     );
 
   return adapters.slice(
     safeOffset,
+
     safeOffset +
-      safeLimit
+    safeLimit
   );
 }
 
@@ -217,15 +303,9 @@ function getStoreAdapters(
       options
     );
 
-  /*
-   * Generic JSON feed hanya perlu
-   * dipasang sekali pada batch awal.
-   */
   const includeFeeds =
     !options.offset &&
-    !options
-      .storeIds
-      ?.length;
+    !options.storeIds?.length;
 
   return includeFeeds
     ? [
@@ -243,5 +323,6 @@ function getStoreAdapterCount() {
 module.exports = {
   getStoreAdapters,
   getStoreAdapterCount,
-  buildRegistryAdapters
+  buildRegistryAdapters,
+  buildStoreAdapter
 };
