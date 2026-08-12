@@ -20,6 +20,31 @@ const duniagames =
     './duniagames'
   );
 
+/*
+ * Dedicated adapters untuk store dengan struktur
+ * yang tidak cukup stabil jika hanya mengandalkan
+ * universal parser.
+ */
+const gigames =
+  require(
+    './gigames'
+  );
+
+const ouraStore =
+  require(
+    './oura-store'
+  );
+
+const kiosGameIndonesia =
+  require(
+    './kios-game-indonesia'
+  );
+
+const topupdeh =
+  require(
+    './topupdeh'
+  );
+
 const {
   makeGenericAdapters
 } = require(
@@ -55,7 +80,20 @@ const DEDICATED = {
   codashop,
   unipin,
   lapakgaming,
-  duniagames
+  duniagames,
+
+  /*
+   * Dedicated recovery adapters.
+   */
+  gigames,
+
+  'oura-store':
+    ouraStore,
+
+  'kios-game-indonesia':
+    kiosGameIndonesia,
+
+  topupdeh
 };
 
 function normalizeStrategyList(
@@ -86,7 +124,9 @@ function normalizeStrategyList(
           .trim()
           .toLowerCase()
     )
-    .filter(Boolean)
+    .filter(
+      Boolean
+    )
     .filter(
       (value) => {
         if (
@@ -117,9 +157,6 @@ function buildStoreAdapter(
 
   /*
    * PUBLIC API
-   *
-   * Hanya aktif jika store.publicApi
-   * memang dikonfigurasi.
    */
   if (
     isPublicApiConfigured(
@@ -151,8 +188,7 @@ function buildStoreAdapter(
   /*
    * UNIVERSAL
    *
-   * Tetap menjadi fallback kecuali
-   * secara eksplisit dinonaktifkan.
+   * Tetap menjadi fallback.
    */
   if (
     store.disableUniversal !==
@@ -184,10 +220,6 @@ function buildStoreAdapter(
 
   /*
    * Compatibility guard.
-   *
-   * Kalau accessStrategies typo atau
-   * tidak cocok, jangan membuat toko
-   * hilang seluruhnya.
    */
   if (
     !strategies.length
