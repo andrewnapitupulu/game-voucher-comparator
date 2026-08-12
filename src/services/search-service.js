@@ -55,7 +55,9 @@ function envBoolean(
   }
 
   return (
-    String(value)
+    String(
+      value
+    )
       .toLowerCase() ===
     'true'
   );
@@ -68,15 +70,20 @@ function boundedNumber(
   max
 ) {
   const parsed =
-    Number(value);
+    Number(
+      value
+    );
 
   const resolved =
-    Number.isFinite(parsed)
+    Number.isFinite(
+      parsed
+    )
       ? parsed
       : fallback;
 
   return Math.max(
     min,
+
     Math.min(
       max,
       resolved
@@ -109,7 +116,9 @@ async function resolveGame(
   }
 
   const local =
-    findLocalGame(query);
+    findLocalGame(
+      query
+    );
 
   if (
     local
@@ -188,11 +197,15 @@ async function allSettledWithConcurrency(
 
           value:
             await task(
-              items[index],
+              items[
+                index
+              ],
               index
             )
         };
-      } catch (reason) {
+      } catch (
+        reason
+      ) {
         results[
           index
         ] = {
@@ -243,8 +256,11 @@ function resolveHttpStatus(
     );
 
   if (
-    Number.isFinite(direct) &&
-    direct > 0
+    Number.isFinite(
+      direct
+    ) &&
+    direct >
+      0
   ) {
     return direct;
   }
@@ -260,7 +276,9 @@ function resolveHttpStatus(
 
   return match
     ? Number(
-        match[1]
+        match[
+          1
+        ]
       )
     : null;
 }
@@ -286,14 +304,6 @@ function classifyProviderFailure(
       error,
       message
     );
-
-  /*
-   * PENTING:
-   *
-   * CANDIDATE_BLOCKED dan
-   * DISCOVERY_BLOCKED harus diperiksa
-   * sebelum generic HTTP 403.
-   */
 
   if (
     code ===
@@ -348,10 +358,9 @@ function classifyProviderFailure(
       401,
       403,
       451
-    ]
-      .includes(
-        httpStatus
-      ) ||
+    ].includes(
+      httpStatus
+    ) ||
     /\bforbidden\b/i.test(
       message
     )
@@ -370,7 +379,7 @@ function classifyProviderFailure(
         false,
 
       message:
-        `ACCESS BLOCKED · URL game ber-confidence tinggi mengembalikan HTTP ${httpStatus || 403}`
+        `ACCESS BLOCKED · Strategi akses toko mengembalikan HTTP ${httpStatus || 403}`
     };
   }
 
@@ -549,7 +558,7 @@ function classifyProviderFailure(
   if (
     code ===
       'PARSER_FAILED' ||
-    /harga\/produk|harga tidak ditemukan|feed tidak mengembalikan produk|struktur halaman belum didukung|konten produk kemungkinan dimuat|produk berhasil dibaca/i.test(
+    /harga\/produk|harga tidak ditemukan|feed tidak mengembalikan produk|struktur halaman belum didukung|konten produk kemungkinan dimuat|produk berhasil dibaca|public api/i.test(
       message
     )
   ) {
@@ -582,6 +591,15 @@ function classifyProviderFailure(
       PARTIAL_MATCH_ONLY:
         'Sebagian data berhasil dibaca, tetapi belum menghasilkan offer yang dapat digunakan',
 
+      API_RESPONSE_INVALID_JSON:
+        'Public API dapat diakses tetapi responsnya bukan JSON valid',
+
+      API_NO_PRODUCT_ARRAY:
+        'Public API dapat diakses tetapi array produk belum dapat ditemukan',
+
+      API_NO_VALID_PRODUCTS:
+        'Public API mengembalikan data tetapi tidak ada produk valid untuk game target',
+
       UNSUPPORTED_STRUCTURE:
         'Struktur halaman belum didukung parser saat ini'
     };
@@ -598,20 +616,14 @@ function classifyProviderFailure(
         false,
 
       message:
-        `PARSER FAILED · ${
-          detailMessages[
-            detailCode
-          ] ||
-          detailMessages
-            .UNSUPPORTED_STRUCTURE
-        }`
+        `PARSER FAILED · ${detailMessages[detailCode] || detailMessages.UNSUPPORTED_STRUCTURE}`
     };
   }
 
   if (
     code ===
       'NOT_CONFIGURED' ||
-    /url toko belum dikonfigurasi|url feed belum diatur/i.test(
+    /url toko belum dikonfigurasi|url feed belum diatur|endpoint belum dikonfigurasi|method public api/i.test(
       message
     )
   ) {
@@ -628,7 +640,7 @@ function classifyProviderFailure(
         false,
 
       message:
-        'NOT CONFIGURED · Belum ada URL atau metode integrasi untuk game ini'
+        'NOT CONFIGURED · Belum ada URL atau metode integrasi yang valid untuk strategi ini'
     };
   }
 
@@ -638,10 +650,9 @@ function classifyProviderFailure(
     [
       404,
       410
-    ]
-      .includes(
-        httpStatus
-      )
+    ].includes(
+      httpStatus
+    )
   ) {
     return {
       statusCode:
@@ -684,11 +695,7 @@ function classifyProviderFailure(
         true,
 
       message:
-        `STORE ERROR · ${
-          httpStatus
-            ? `HTTP ${httpStatus}`
-            : 'server toko sedang bermasalah'
-        }`
+        `STORE ERROR · ${httpStatus ? `HTTP ${httpStatus}` : 'server toko sedang bermasalah'}`
     };
   }
 
@@ -786,10 +793,6 @@ async function searchPrices(
       10000
     );
 
-  /*
-   * Diturunkan dari 3 menjadi 2
-   * untuk mengurangi burst request.
-   */
   const storeConcurrency =
     boundedNumber(
       process.env
@@ -811,6 +814,7 @@ async function searchPrices(
   const offset =
     Math.max(
       0,
+
       Number(
         options.offset
       ) ||
@@ -820,8 +824,10 @@ async function searchPrices(
   const limit =
     Math.max(
       1,
+
       Math.min(
         20,
+
         Number(
           options.limit
         ) ||
@@ -844,7 +850,9 @@ async function searchPrices(
       query
     );
 
-  if (!game) {
+  if (
+    !game
+  ) {
     return {
       ok:
         false,
@@ -897,13 +905,24 @@ async function searchPrices(
         index
       ) => {
         const adapter =
-          adapters[index];
+          adapters[
+            index
+          ];
 
         const registry =
           STORE_BY_ID[
             adapter.id
           ] ||
           {};
+
+        const diagnostics =
+          adapter
+            .getLastDiagnostics
+            ?.() ||
+          result
+            .reason
+            ?.accessDiagnostics ||
+          null;
 
         const common = {
           id:
@@ -920,7 +939,25 @@ async function searchPrices(
           verification:
             adapter.verification ||
             registry.verification ||
-            'feed'
+            'feed',
+
+          accessStrategy:
+            diagnostics
+              ?.selectedStrategy ||
+            null,
+
+          /*
+           * Sangat berguna untuk
+           * mengetahui:
+           *
+           * public-api -> gagal
+           * dedicated  -> gagal
+           * universal  -> berhasil
+           */
+          accessAttempts:
+            diagnostics
+              ?.attempts ||
+            []
         };
 
         if (
@@ -933,8 +970,22 @@ async function searchPrices(
               .offers
           );
 
+          const selectedStrategy =
+            diagnostics
+              ?.selectedStrategy ||
+            result
+              .value
+              .offers[
+                0
+              ]
+              ?.accessStrategy ||
+            'direct';
+
           return {
             ...common,
+
+            accessStrategy:
+              selectedStrategy,
 
             ok:
               true,
@@ -961,7 +1012,7 @@ async function searchPrices(
                 .length,
 
             message:
-              `${result.value.offers.length} harga live ditemukan`
+              `${result.value.offers.length} harga live ditemukan · ${selectedStrategy}`
           };
         }
 
@@ -1132,7 +1183,9 @@ async function searchPrices(
     },
 
     cheapestOverall:
-      groups[0] ||
+      groups[
+        0
+      ] ||
       null,
 
     providerStatus,
@@ -1145,7 +1198,7 @@ async function searchPrices(
     groups,
 
     notice:
-      'Harga diambil real-time. Direct/discovered/sitemap URL diprioritaskan, guessed URL dibatasi, dan 403 dari URL tebakan tidak lagi dianggap otomatis sebagai ACCESS BLOCKED.'
+      'Harga diambil real-time dengan strategi public API → dedicated adapter → universal parser. Strategi berikutnya hanya dicoba ketika aman dan relevan; 403 pada dedicated/universal tidak dibypass.'
   };
 }
 
