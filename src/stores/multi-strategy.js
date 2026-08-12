@@ -27,8 +27,7 @@ const ERROR_PRIORITY = {
 function errorPriority(error) {
   return (
     ERROR_PRIORITY[
-      String(error?.code || '')
-        .toUpperCase()
+      String(error?.code || '').toUpperCase()
     ] || 0
   );
 }
@@ -58,20 +57,24 @@ function shouldStopChain(
   ).toUpperCase();
 
   /*
-   * Jika upstream meminta rate limit,
-   * hentikan chain.
+   * RATE_LIMITED:
+   * jangan lanjut melakukan request tambahan.
    */
   if (code === 'RATE_LIMITED') {
     return true;
   }
 
+  /*
+   * Error selain ACCESS_BLOCKED
+   * masih boleh melanjutkan strategy chain.
+   */
   if (code !== 'ACCESS_BLOCKED') {
     return false;
   }
 
   /*
-   * Public API dapat mempunyai policy akses
-   * yang berbeda dengan halaman web.
+   * Public API terkadang punya policy akses
+   * yang berbeda dengan halaman website.
    */
   if (strategyId === 'public-api') {
     return Boolean(
@@ -80,8 +83,14 @@ function shouldStopChain(
   }
 
   /*
-   * Dedicated adapter diblokir:
-   * default jangan bombardir origin yang sama.
+   * Dedicated adapter diblokir.
+   *
+   * Secara default hentikan request berikutnya
+   * untuk mencegah bombardir origin yang sama.
+   *
+   * Bisa dioverride melalui:
+   *
+   * continueAfterBlocked: true
    */
   if (strategyId === 'dedicated') {
     return (
@@ -90,7 +99,7 @@ function shouldStopChain(
   }
 
   /*
-   * Universal merupakan strategi terakhir.
+   * Universal merupakan strategy terakhir.
    */
   return true;
 }
@@ -101,6 +110,7 @@ function mapOffersWithStrategy(
 ) {
   return offers.map((offer) => ({
     ...offer,
+
     accessStrategy:
       offer.accessStrategy ||
       strategyId
@@ -114,8 +124,10 @@ function attemptLog(
 ) {
   return {
     strategy,
+
     durationMs:
       Date.now() - startedAt,
+
     ...details
   };
 }
@@ -131,6 +143,7 @@ function createMultiStrategyAdapter(
     name: store.name,
     category: store.category,
     verification: store.verification,
+
     strategy: 'multi',
 
     getLastDiagnostics() {
@@ -142,12 +155,26 @@ function createMultiStrategyAdapter(
       options = {}
     ) {
       const attempts = [];
+
       let strongestError = null;
 
       for (const strategy of strategies) {
-        const startedAt = Date.now();
+        const startedAt =
+          Date.now();
 
         try {
+          /*
+           * ==================================================
+           * NORMAL STRATEGY
+           * ==================================================
+           *
+           * Urutan strategy tetap mengikuti konfigurasi
+           * adapter yang sudah ada:
+           *
+           * public-api
+           * dedicated
+           * universal
+           */
           const offers =
             await strategy.adapter.fetchOffers(
               game,
@@ -160,13 +187,23 @@ function createMultiStrategyAdapter(
               startedAt,
               {
                 ok: true,
-                count: offers.length
+
+                count:
+                  Array.isArray(offers)
+                    ? offers.length
+                    : 0
               }
             )
           );
 
+          /*
+           * Strategy dianggap sukses jika adapter
+           * mengembalikan offers tanpa exception.
+           */
           lastDiagnostics = {
-            selectedStrategy: strategy.id,
+            selectedStrategy:
+              strategy.id,
+
             attempts
           };
 
@@ -175,26 +212,41 @@ function createMultiStrategyAdapter(
             strategy.id
           );
         } catch (error) {
+          /*
+           * Simpan diagnostics dari strategy
+           * yang baru saja gagal.
+           */
           attempts.push(
             attemptLog(
               strategy.id,
               startedAt,
               {
                 ok: false,
+
                 code:
                   error?.code ||
                   'UNKNOWN_ERROR',
 
                 status:
-                  error?.status ?? null,
+                  error?.status ??
+                  null,
 
                 parserReason:
                   error?.parserReason ||
+                  null,
+
+                message:
+                  error?.message ||
                   null
               }
             )
           );
 
+          /*
+           * Simpan error paling relevan
+           * untuk dikembalikan jika semua
+           * strategy gagal.
+           */
           strongestError =
             pickStrongerError(
               strongestError,
@@ -206,16 +258,20 @@ function createMultiStrategyAdapter(
            * PARSER RECOVERY
            * ==================================================
            *
-           * Universal parser tidak lagi menjadi jalan buntu
-           * untuk store yang mempunyai recovery profile.
+           * Recovery hanya dijalankan ketika:
            *
-           * Recovery hanya aktif untuk:
+           * 1. Strategy yang gagal adalah universal
+           * 2. Store mempunyai recovery configuration
+           * 3. Error termasuk recoverable error
+           *
+           * Recoverable error:
            *
            * PARSER_FAILED
            * PAGE_NOT_VERIFIED
            * PAGE_NOT_FOUND
            *
-           * ACCESS_BLOCKED dan RATE_LIMITED tidak dipaksa.
+           * ACCESS_BLOCKED dan RATE_LIMITED
+           * TIDAK dipaksa masuk recovery.
            */
           if (
             strategy.id === 'universal' &&
@@ -228,6 +284,17 @@ function createMultiStrategyAdapter(
               Date.now();
 
             try {
+              /*
+               * Parser recovery akan mencoba:
+               *
+               * - alternative route
+               * - locale-specific route
+               * - catalog/discovery page
+               * - discovered product URL
+               *
+               * lalu tetap menggunakan parseOffers()
+               * milik universal parser.
+               */
               const recoveredOffers =
                 await tryParserRecovery(
                   store,
@@ -242,8 +309,13 @@ function createMultiStrategyAdapter(
                   recoveryStartedAt,
                   {
                     ok: true,
+
                     count:
-                      recoveredOffers.length
+                      Array.isArray(
+                        recoveredOffers
+                      )
+                        ? recoveredOffers.length
+                        : 0
                   }
                 )
               );
@@ -251,6 +323,7 @@ function createMultiStrategyAdapter(
               lastDiagnostics = {
                 selectedStrategy:
                   'parser-recovery',
+
                 attempts
               };
 
@@ -261,6 +334,13 @@ function createMultiStrategyAdapter(
             } catch (
               recoveryError
             ) {
+              /*
+               * Recovery juga gagal.
+               *
+               * Simpan semua diagnostics-nya,
+               * termasuk URL candidate yang
+               * sudah dicoba.
+               */
               attempts.push(
                 attemptLog(
                   'parser-recovery',
@@ -283,6 +363,11 @@ function createMultiStrategyAdapter(
                         ?.parserReason ||
                       null,
 
+                    message:
+                      recoveryError
+                        ?.message ||
+                      null,
+
                     recoveryDiagnostics:
                       recoveryError
                         ?.parserRecoveryDiagnostics ||
@@ -299,6 +384,20 @@ function createMultiStrategyAdapter(
             }
           }
 
+          /*
+           * ==================================================
+           * STOP CHAIN CHECK
+           * ==================================================
+           *
+           * Hentikan request tambahan jika:
+           *
+           * RATE_LIMITED
+           *
+           * atau
+           *
+           * ACCESS_BLOCKED berdasarkan
+           * policy store.
+           */
           if (
             shouldStopChain(
               strategy.id,
@@ -311,6 +410,11 @@ function createMultiStrategyAdapter(
         }
       }
 
+      /*
+       * ==================================================
+       * ALL STRATEGIES FAILED
+       * ==================================================
+       */
       lastDiagnostics = {
         selectedStrategy: null,
         attempts
@@ -327,6 +431,10 @@ function createMultiStrategyAdapter(
           'UNKNOWN_ERROR';
       }
 
+      /*
+       * Diagnostics ini nantinya bisa digunakan
+       * di API response / console / debug UI.
+       */
       finalError.accessDiagnostics =
         lastDiagnostics;
 
