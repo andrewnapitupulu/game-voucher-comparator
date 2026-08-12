@@ -29,7 +29,10 @@ const {
   extractLinks,
   linkScore,
   makeCandidateUrls,
-  discoverSitemapUrls,
+  makeDirectCandidateEntries,
+  makeDiscoveredCandidateEntries,
+  makeGuessedCandidateEntries,
+  discoverSitemapCandidates,
   gameIdentityCandidates,
   isStrongIdentity,
   containsPhrase
@@ -44,21 +47,6 @@ const {
   '../config/games'
 );
 
-/*
- * Error yang membuktikan halaman
- * berhasil ditemukan harus mengalahkan
- * 404 dari URL tebakan.
- *
- * Contoh:
- *
- * candidate 1 → 404
- * candidate 2 → page valid, parser gagal
- *
- * hasil akhir:
- * PARSER_FAILED
- *
- * bukan PAGE_NOT_FOUND.
- */
 const ERROR_PRIORITY = {
   PARSER_FAILED:
     100,
@@ -67,34 +55,40 @@ const ERROR_PRIORITY = {
     90,
 
   ACCESS_BLOCKED:
-    80,
+    85,
 
   RATE_LIMITED:
-    75,
+    80,
 
   NETWORK_TLS_ERROR:
-    70,
+    72,
 
   NETWORK_CONNECTION_ERROR:
-    68,
+    70,
 
   NETWORK_DNS_ERROR:
-    66,
+    68,
 
   NETWORK_CONNECT_TIMEOUT:
-    64,
+    66,
 
   NETWORK_FETCH_FAILED:
-    62,
+    64,
 
   TIMEOUT:
-    60,
+    62,
 
   UPSTREAM_ERROR:
-    50,
+    55,
 
   HTTP_ERROR:
-    40,
+    45,
+
+  DISCOVERY_BLOCKED:
+    30,
+
+  CANDIDATE_BLOCKED:
+    25,
 
   PAGE_NOT_FOUND:
     10,
@@ -109,9 +103,7 @@ function providerError(
   details = {}
 ) {
   const error =
-    new Error(
-      message
-    );
+    new Error(message);
 
   error.code =
     code;
@@ -127,17 +119,14 @@ function providerError(
 function errorPriority(
   error
 ) {
-  const code =
-    String(
-      error?.code ||
-      ''
-    )
-      .toUpperCase();
-
   return (
     ERROR_PRIORITY[
-      code
-    ] ??
+      String(
+        error?.code ||
+        ''
+      )
+        .toUpperCase()
+    ] ||
     0
   );
 }
@@ -154,50 +143,12 @@ function pickStrongerError(
     return candidate;
   }
 
-  const currentPriority =
-    errorPriority(
-      current
-    );
-
-  const candidatePriority =
-    errorPriority(
-      candidate
-    );
-
-  if (
-    candidatePriority >
-    currentPriority
-  ) {
-    return candidate;
-  }
-
-  if (
-    candidatePriority <
-    currentPriority
-  ) {
-    return current;
-  }
-
-  const currentStatus =
-    Number(
-      current?.status
-    ) ||
-    0;
-
-  const candidateStatus =
-    Number(
-      candidate?.status
-    ) ||
-    0;
-
-  if (
-    !currentStatus &&
-    candidateStatus
-  ) {
-    return candidate;
-  }
-
-  return current;
+  return (
+    errorPriority(candidate) >
+    errorPriority(current)
+      ? candidate
+      : current
+  );
 }
 
 function stripTags(
@@ -234,26 +185,17 @@ function uniqueNormalized(
     values
   ) {
     const normalized =
-      normalizeText(
-        value
-      );
+      normalizeText(value);
 
     if (
       !normalized ||
-      seen.has(
-        normalized
-      )
+      seen.has(normalized)
     ) {
       continue;
     }
 
-    seen.add(
-      normalized
-    );
-
-    result.push(
-      normalized
-    );
+    seen.add(normalized);
+    result.push(normalized);
   }
 
   return result;
@@ -263,22 +205,18 @@ function countPhrase(
   haystack,
   phrase
 ) {
-  const normalizedHaystack =
-    ` ${normalizeText(
-      haystack
-    )} `;
+  const h =
+    ` ${normalizeText(haystack)} `;
 
-  const normalizedPhrase =
-    normalizeText(
-      phrase
-    );
+  const p =
+    normalizeText(phrase);
 
-  if (!normalizedPhrase) {
+  if (!p) {
     return 0;
   }
 
   const needle =
-    ` ${normalizedPhrase} `;
+    ` ${p} `;
 
   let count =
     0;
@@ -288,10 +226,10 @@ function countPhrase(
 
   while (
     cursor <
-    normalizedHaystack.length
+    h.length
   ) {
     const index =
-      normalizedHaystack.indexOf(
+      h.indexOf(
         needle,
         cursor
       );
@@ -322,9 +260,7 @@ function extractTagTexts(
     [];
 
   const tags =
-    tagNames.join(
-      '|'
-    );
+    tagNames.join('|');
 
   const regex =
     new RegExp(
@@ -337,9 +273,7 @@ function extractTagTexts(
     String(
       html ||
       ''
-    ).matchAll(
-      regex
-    )
+    ).matchAll(regex)
   ) {
     const text =
       stripTags(
@@ -347,9 +281,7 @@ function extractTagTexts(
       );
 
     if (text) {
-      result.push(
-        text
-      );
+      result.push(text);
     }
   }
 
@@ -379,20 +311,18 @@ function extractMetaContent(
     String(
       html ||
       ''
-    ).matchAll(
-      regex
-    )
+    ).matchAll(regex)
   ) {
-    const attributes =
+    const attrs =
       match[1];
 
     const keyMatch =
-      attributes.match(
+      attrs.match(
         /(?:name|property)\s*=\s*(?:"([^"]+)"|'([^']+)'|([^\s>]+))/i
       );
 
     const contentMatch =
-      attributes.match(
+      attrs.match(
         /content\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i
       );
 
@@ -406,9 +336,7 @@ function extractMetaContent(
         .toLowerCase();
 
     if (
-      !wanted.has(
-        key
-      )
+      !wanted.has(key)
     ) {
       continue;
     }
@@ -427,9 +355,7 @@ function extractMetaContent(
         .trim();
 
     if (content) {
-      result.push(
-        content
-      );
+      result.push(content);
     }
   }
 
@@ -439,71 +365,50 @@ function extractMetaContent(
 function getPageSignals(
   html
 ) {
-  const titles =
-    extractTagTexts(
-      html,
-      [
-        'title'
-      ]
-    );
-
-  const headings =
-    extractTagTexts(
-      html,
-      [
-        'h1',
-        'h2'
-      ]
-    );
-
-  const meta =
-    extractMetaContent(
-      html,
-      [
-        'og:title',
-        'twitter:title',
-        'description',
-        'og:description'
-      ]
-    );
-
-  const structuredText =
-    extractStructuredIdentityText(
-      html
-    );
-
-  const lines =
-    htmlToLines(
-      html
-    );
-
   return {
     titleText:
-      titles.join(
-        ' '
-      ),
+      extractTagTexts(
+        html,
+        [
+          'title'
+        ]
+      )
+        .join(' '),
 
     headingText:
-      headings.join(
-        ' '
-      ),
+      extractTagTexts(
+        html,
+        [
+          'h1',
+          'h2'
+        ]
+      )
+        .join(' '),
 
     metaText:
-      meta.join(
-        ' '
+      extractMetaContent(
+        html,
+        [
+          'og:title',
+          'twitter:title',
+          'description',
+          'og:description'
+        ]
+      )
+        .join(' '),
+
+    structuredText:
+      extractStructuredIdentityText(
+        html
       ),
 
-    structuredText,
-
     bodyText:
-      lines
+      htmlToLines(html)
         .slice(
           0,
           1200
         )
-        .join(
-          ' '
-        )
+        .join(' ')
   };
 }
 
@@ -513,16 +418,12 @@ function homepageLikeUrl(
 ) {
   try {
     const url =
-      new URL(
-        urlValue
-      );
+      new URL(urlValue);
 
     const home =
-      new URL(
-        homepage
-      );
+      new URL(homepage);
 
-    const cleanPath =
+    const clean =
       (value) =>
         String(
           value ||
@@ -533,17 +434,17 @@ function homepageLikeUrl(
             ''
           )
           .replace(
-            /^\/+/,
+            /^\/+/g,
             ''
           );
 
     return (
       url.origin ===
         home.origin &&
-      cleanPath(
+      clean(
         url.pathname
       ) ===
-        cleanPath(
+        clean(
           home.pathname
         )
     );
@@ -556,12 +457,8 @@ function strongIdentityMatches(
   text,
   game
 ) {
-  return gameIdentityCandidates(
-    game
-  )
-    .filter(
-      isStrongIdentity
-    )
+  return gameIdentityCandidates(game)
+    .filter(isStrongIdentity)
     .filter(
       (identity) =>
         containsPhrase(
@@ -575,14 +472,10 @@ function shortIdentityMatches(
   text,
   game
 ) {
-  return gameIdentityCandidates(
-    game
-  )
+  return gameIdentityCandidates(game)
     .filter(
       (identity) =>
-        !isStrongIdentity(
-          identity
-        )
+        !isStrongIdentity(identity)
     )
     .filter(
       (identity) =>
@@ -597,19 +490,17 @@ function pageHasTargetUnitEvidence(
   text,
   game
 ) {
-  const unitAliases =
-    uniqueNormalized(
-      game?.unitAliases ||
-      []
+  return uniqueNormalized(
+    game?.unitAliases ||
+    []
+  )
+    .some(
+      (unit) =>
+        containsPhrase(
+          text,
+          unit
+        )
     );
-
-  return unitAliases.some(
-    (unit) =>
-      containsPhrase(
-        text,
-        unit
-      )
-  );
 }
 
 function findCompetingStructuredGame(
@@ -644,9 +535,9 @@ function findCompetingStructuredGame(
       continue;
     }
 
-    const longest =
-      matches
-        .map(
+    const strength =
+      Math.max(
+        ...matches.map(
           (match) =>
             match
               .replace(
@@ -655,28 +546,18 @@ function findCompetingStructuredGame(
               )
               .length
         )
-        .sort(
-          (
-            a,
-            b
-          ) =>
-            b -
-            a
-        )[
-          0
-        ];
+      );
 
     if (
       !best ||
-      longest >
+      strength >
         best.strength
     ) {
       best = {
         game:
           otherGame,
 
-        strength:
-          longest
+        strength
       };
     }
   }
@@ -691,14 +572,7 @@ function validatePageForGame(
   game
 ) {
   const signals =
-    getPageSignals(
-      html
-    );
-
-  const urlText =
-    normalizeText(
-      finalUrl
-    );
+    getPageSignals(html);
 
   const titleMatches =
     strongIdentityMatches(
@@ -726,7 +600,7 @@ function validatePageForGame(
 
   const urlMatches =
     strongIdentityMatches(
-      urlText,
+      normalizeText(finalUrl),
       game
     );
 
@@ -742,20 +616,13 @@ function validatePageForGame(
       game
     );
 
-  const canonicalIdentities =
-    gameIdentityCandidates(
-      game
-    )
-      .filter(
-        isStrongIdentity
-      );
-
   let bodyOccurrences =
     0;
 
   for (
     const identity of
-    canonicalIdentities
+    gameIdentityCandidates(game)
+      .filter(isStrongIdentity)
   ) {
     bodyOccurrences =
       Math.max(
@@ -862,10 +729,6 @@ function validatePageForGame(
       100;
   }
 
-  /*
-   * Page ternyata jelas merupakan
-   * game lain.
-   */
   if (
     competingTitle &&
     !titleMatches.length &&
@@ -887,9 +750,6 @@ function validatePageForGame(
     };
   }
 
-  /*
-   * Soft 404 / redirect ke homepage.
-   */
   if (
     homepageLikeUrl(
       finalUrl,
@@ -953,12 +813,8 @@ function containsExplicitGameName(
   text,
   game
 ) {
-  return gameIdentityCandidates(
-    game
-  )
-    .filter(
-      isStrongIdentity
-    )
+  return gameIdentityCandidates(game)
+    .filter(isStrongIdentity)
     .some(
       (identity) =>
         containsPhrase(
@@ -1003,14 +859,10 @@ function namedPackageMatchesGame(
   game
 ) {
   const text =
-    normalizeText(
-      name
-    );
+    normalizeText(name);
 
   if (
-    /\bwelkin\b|blessing of the welkin moon/.test(
-      text
-    )
+    /\bwelkin\b|blessing of the welkin moon/.test(text)
   ) {
     return (
       game.id ===
@@ -1019,9 +871,7 @@ function namedPackageMatchesGame(
   }
 
   if (
-    /weekly diamond pass|\bwdp\b|starlight|twilight pass/.test(
-      text
-    )
+    /weekly diamond pass|\bwdp\b|starlight|twilight pass/.test(text)
   ) {
     return (
       game.id ===
@@ -1030,9 +880,7 @@ function namedPackageMatchesGame(
   }
 
   if (
-    /royale pass/.test(
-      text
-    )
+    /royale pass/.test(text)
   ) {
     return (
       game.id ===
@@ -1041,9 +889,7 @@ function namedPackageMatchesGame(
   }
 
   if (
-    /honor pass/.test(
-      text
-    )
+    /honor pass/.test(text)
   ) {
     return (
       game.id ===
@@ -1052,9 +898,7 @@ function namedPackageMatchesGame(
   }
 
   if (
-    /express supply pass/.test(
-      text
-    )
+    /express supply pass/.test(text)
   ) {
     return (
       game.id ===
@@ -1063,9 +907,7 @@ function namedPackageMatchesGame(
   }
 
   if (
-    /inter knot membership/.test(
-      text
-    )
+    /inter knot membership/.test(text)
   ) {
     return (
       game.id ===
@@ -1074,9 +916,7 @@ function namedPackageMatchesGame(
   }
 
   if (
-    /coronomicon monthly(?: package)?|^special data$|^zero data$/.test(
-      text
-    )
+    /coronomicon monthly(?: package)?|^special data$|^zero data$/.test(text)
   ) {
     return (
       game.id ===
@@ -1085,9 +925,7 @@ function namedPackageMatchesGame(
   }
 
   if (
-    /lunite subscription/.test(
-      text
-    )
+    /lunite subscription/.test(text)
   ) {
     return (
       game.id ===
@@ -1177,9 +1015,7 @@ function buildParserDiagnostics({
   const visibleProductCandidates =
     lines.filter(
       (line) =>
-        isProductName(
-          line
-        )
+        isProductName(line)
     ).length;
 
   const visiblePriceCandidates =
@@ -1194,9 +1030,7 @@ function buildParserDiagnostics({
     structured
       ?.diagnostics
       ?.dynamic ||
-    detectDynamicPageSignals(
-      html
-    );
+    detectDynamicPageSignals(html);
 
   let parserReason =
     'UNSUPPORTED_STRUCTURE';
@@ -1236,7 +1070,7 @@ function buildParserDiagnostics({
     structured
       .diagnostics
       .documentCount >
-    0
+      0
   ) {
     parserReason =
       'JSON_DATA_FOUND_NO_MATCH';
@@ -1264,9 +1098,7 @@ function buildParserDiagnostics({
       jsonOffers.length,
 
     structuredOfferCount:
-      structured
-        .offers
-        .length,
+      structured.offers.length,
 
     filteredOfferCount:
       filteredOffers.length,
@@ -1302,9 +1134,7 @@ function parseOffers(
   };
 
   const lines =
-    htmlToLines(
-      html
-    );
+    htmlToLines(html);
 
   const lineOffers =
     extractOffersFromLines(
@@ -1405,6 +1235,94 @@ function parserFailureMessage(
   );
 }
 
+function convertCandidateError(
+  error,
+  candidate
+) {
+  const code =
+    String(
+      error?.code ||
+      ''
+    )
+      .toUpperCase();
+
+  /*
+   * Ini inti perbaikannya:
+   *
+   * 403 dari URL tebakan tidak boleh
+   * dianggap sebagai ACCESS BLOCKED
+   * untuk seluruh toko.
+   */
+  if (
+    code ===
+      'ACCESS_BLOCKED' &&
+    candidate.source ===
+      'guessed'
+  ) {
+    return providerError(
+      'CANDIDATE_BLOCKED',
+
+      `Candidate URL tebakan mengembalikan HTTP ${error.status || 403}`,
+
+      {
+        status:
+          error.status ||
+          403,
+
+        finalUrl:
+          error.finalUrl ||
+          candidate.url,
+
+        candidateSource:
+          candidate.source,
+
+        candidateConfidence:
+          candidate.confidence
+      }
+    );
+  }
+
+  error.candidateSource =
+    candidate.source;
+
+  error.candidateConfidence =
+    candidate.confidence;
+
+  return error;
+}
+
+function convertDiscoveryError(
+  error
+) {
+  if (
+    String(
+      error?.code ||
+      ''
+    )
+      .toUpperCase() ===
+    'ACCESS_BLOCKED'
+  ) {
+    return providerError(
+      'DISCOVERY_BLOCKED',
+
+      `Homepage discovery mengembalikan HTTP ${error.status || 403}`,
+
+      {
+        status:
+          error.status ||
+          403,
+
+        finalUrl:
+          error.finalUrl ||
+          error.url ||
+          null
+      }
+    );
+  }
+
+  return error;
+}
+
 function createUniversalAdapter(
   store
 ) {
@@ -1441,55 +1359,63 @@ function createUniversalAdapter(
         );
 
       /*
-       * Sebelumnya hanya 2 candidate.
-       *
-       * Sekarang default 5.
-       *
-       * Maksimum hard limit tetap 7
-       * agar request tidak liar.
+       * Sebelumnya default 5.
+       * Sekarang kembali konservatif: 3.
        */
-      const maxPages =
+      const maxPageProbes =
         Math.max(
           1,
-
           Math.min(
-            7,
-
+            5,
             Number(
               process.env
                 .MAX_PAGE_PROBES_PER_STORE ||
-              5
-            )
-          )
-        );
-
-      /*
-       * Tiga candidate awal dicoba
-       * sebelum sitemap discovery.
-       */
-      const initialProbeLimit =
-        Math.max(
-          1,
-
-          Math.min(
-            maxPages,
-
-            Number(
-              process.env
-                .INITIAL_PAGE_PROBES_PER_STORE ||
               3
             )
           )
         );
 
-      let homepageHtml =
-        '';
+      const maxDiscoveredProbes =
+        Math.max(
+          1,
+          Math.min(
+            2,
+            Number(
+              process.env
+                .MAX_DISCOVERED_PROBES_PER_STORE ||
+              1
+            )
+          )
+        );
 
-      let homepageError =
-        null;
+      const maxSitemapProbes =
+        Math.max(
+          1,
+          Math.min(
+            2,
+            Number(
+              process.env
+                .MAX_SITEMAP_PROBES_PER_STORE ||
+              1
+            )
+          )
+        );
 
-      let strongestError =
-        null;
+      /*
+       * Guessed URL dibuat sangat terbatas.
+       */
+      const maxGuessedProbes =
+        Math.max(
+          0,
+          Math.min(
+            2,
+            Number(
+              process.env
+                .MAX_GUESSED_PROBES_PER_STORE ||
+              1
+            )
+          )
+        );
 
       const attemptedUrls =
         [];
@@ -1500,249 +1426,16 @@ function createUniversalAdapter(
       let pageAttempts =
         0;
 
-      /*
-       * ==================================================
-       * HOMEPAGE DISCOVERY
-       * ==================================================
-       */
-      try {
-        const homepage =
-          await fetchText(
-            store.homepage,
-            {
-              timeoutMs:
-                Math.min(
-                  timeoutMs,
-                  3500
-                ),
+      let strongestError =
+        null;
 
-              retries:
-                1
-            }
-          );
+      let homepageError =
+        null;
 
-        homepageHtml =
-          homepage.text;
-      } catch (
-        error
-      ) {
-        /*
-         * Homepage gagal bukan berarti
-         * game URL pasti gagal.
-         *
-         * Template candidate tetap
-         * akan dicoba.
-         */
-        homepageError =
-          error;
-      }
-
-      const initialCandidates =
-        makeCandidateUrls(
-          store,
-          game,
-          homepageHtml
-        );
-
-      /*
-       * ==================================================
-       * CANDIDATE PROBER
-       * ==================================================
-       */
-      async function probeUrls(
-        urls,
-        limit = maxPages
-      ) {
-        for (
-          const url of
-          urls
-        ) {
-          if (
-            pageAttempts >=
-              maxPages ||
-            pageAttempts >=
-              limit
-          ) {
-            break;
-          }
-
-          if (
-            !url ||
-            attemptedSet.has(
-              url
-            )
-          ) {
-            continue;
-          }
-
-          attemptedSet.add(
-            url
-          );
-
-          attemptedUrls.push(
-            url
-          );
-
-          pageAttempts +=
-            1;
-
-          try {
-            const page =
-              await fetchText(
-                url,
-                {
-                  timeoutMs,
-
-                  retries:
-                    1
-                }
-              );
-
-            const finalUrl =
-              page.finalUrl ||
-              url;
-
-            /*
-             * ============================
-             * VALIDATE TARGET GAME
-             * ============================
-             */
-            const validation =
-              validatePageForGame(
-                page.text,
-                finalUrl,
-                store.homepage,
-                game
-              );
-
-            if (
-              !validation.ok
-            ) {
-              strongestError =
-                pickStrongerError(
-                  strongestError,
-
-                  providerError(
-                    'PAGE_NOT_VERIFIED',
-
-                    `halaman tidak cocok: ${validation.reason}`,
-
-                    {
-                      finalUrl,
-
-                      validationScore:
-                        validation.score
-                    }
-                  )
-                );
-
-              continue;
-            }
-
-            /*
-             * ============================
-             * PARSE PRODUCT
-             * ============================
-             */
-            const parsed =
-              parseOffers(
-                page.text,
-                finalUrl,
-                store,
-                game
-              );
-
-            if (
-              parsed
-                .offers
-                .length
-            ) {
-              /*
-               * Begitu berhasil,
-               * candidate berikutnya
-               * tidak perlu dicoba.
-               */
-              return parsed.offers;
-            }
-
-            strongestError =
-              pickStrongerError(
-                strongestError,
-
-                providerError(
-                  'PARSER_FAILED',
-
-                  parserFailureMessage(
-                    parsed
-                      .diagnostics
-                      .parserReason
-                  ),
-
-                  {
-                    parserReason:
-                      parsed
-                        .diagnostics
-                        .parserReason,
-
-                    parserDiagnostics:
-                      parsed
-                        .diagnostics,
-
-                    finalUrl
-                  }
-                )
-              );
-          } catch (
-            error
-          ) {
-            /*
-             * 404 candidate pertama
-             * tidak lagi otomatis
-             * menjadi error final.
-             */
-            strongestError =
-              pickStrongerError(
-                strongestError,
-                error
-              );
-          }
-        }
-
-        return null;
-      }
-
-      /*
-       * ==================================================
-       * PHASE 1
-       * Direct URL + homepage discovery + tebakan awal
-       * ==================================================
-       */
-      const firstResult =
-        await probeUrls(
-          initialCandidates.slice(
-            0,
-            initialProbeLimit
-          ),
-
-          initialProbeLimit
-        );
-
-      if (
-        firstResult
-      ) {
-        return firstResult;
-      }
-
-      /*
-       * ==================================================
-       * PHASE 2
-       * SITEMAP DISCOVERY
-       * ==================================================
-       *
-       * Sitemap baru dicoba setelah
-       * candidate awal gagal.
-       */
       let sitemapDiscovery = {
+        entries:
+          [],
+
         urls:
           [],
 
@@ -1753,12 +1446,415 @@ function createUniversalAdapter(
           []
       };
 
+      async function probeCandidate(
+        candidate
+      ) {
+        if (
+          !candidate?.url ||
+          pageAttempts >=
+            maxPageProbes ||
+          attemptedSet.has(
+            candidate.url
+          )
+        ) {
+          return {
+            type:
+              'skip'
+          };
+        }
+
+        attemptedSet.add(
+          candidate.url
+        );
+
+        attemptedUrls.push({
+          url:
+            candidate.url,
+
+          source:
+            candidate.source,
+
+          confidence:
+            candidate.confidence
+        });
+
+        pageAttempts +=
+          1;
+
+        try {
+          const page =
+            await fetchText(
+              candidate.url,
+              {
+                timeoutMs,
+
+                /*
+                 * Retry hanya dilakukan
+                 * pada direct/discovered/
+                 * sitemap candidate.
+                 *
+                 * Guessed URL = 0 retry.
+                 */
+                retries:
+                  candidate.confidence ===
+                  'high'
+                    ? 1
+                    : 0
+              }
+            );
+
+          const finalUrl =
+            page.finalUrl ||
+            candidate.url;
+
+          const validation =
+            validatePageForGame(
+              page.text,
+              finalUrl,
+              store.homepage,
+              game
+            );
+
+          if (
+            !validation.ok
+          ) {
+            const error =
+              providerError(
+                'PAGE_NOT_VERIFIED',
+
+                `halaman tidak cocok: ${validation.reason}`,
+
+                {
+                  finalUrl,
+
+                  candidateSource:
+                    candidate.source,
+
+                  candidateConfidence:
+                    candidate.confidence,
+
+                  validationScore:
+                    validation.score
+                }
+              );
+
+            strongestError =
+              pickStrongerError(
+                strongestError,
+                error
+              );
+
+            return {
+              type:
+                'continue'
+            };
+          }
+
+          const parsed =
+            parseOffers(
+              page.text,
+              finalUrl,
+              store,
+              game
+            );
+
+          if (
+            parsed.offers.length
+          ) {
+            return {
+              type:
+                'success',
+
+              offers:
+                parsed.offers
+            };
+          }
+
+          const error =
+            providerError(
+              'PARSER_FAILED',
+
+              parserFailureMessage(
+                parsed
+                  .diagnostics
+                  .parserReason
+              ),
+
+              {
+                parserReason:
+                  parsed
+                    .diagnostics
+                    .parserReason,
+
+                parserDiagnostics:
+                  parsed
+                    .diagnostics,
+
+                finalUrl,
+
+                candidateSource:
+                  candidate.source,
+
+                candidateConfidence:
+                  candidate.confidence
+              }
+            );
+
+          strongestError =
+            pickStrongerError(
+              strongestError,
+              error
+            );
+
+          /*
+           * Halaman sudah terbukti page
+           * game target. Tidak perlu
+           * mencoba URL tambahan lagi.
+           */
+          return {
+            type:
+              'terminal-error',
+
+            error
+          };
+        } catch (rawError) {
+          const error =
+            convertCandidateError(
+              rawError,
+              candidate
+            );
+
+          strongestError =
+            pickStrongerError(
+              strongestError,
+              error
+            );
+
+          /*
+           * 403 hanya dianggap block nyata
+           * jika candidate ber-confidence
+           * tinggi.
+           *
+           * Guessed URL sudah diubah menjadi
+           * CANDIDATE_BLOCKED di atas.
+           */
+          if (
+            String(
+              error?.code ||
+              ''
+            )
+              .toUpperCase() ===
+              'ACCESS_BLOCKED' &&
+            candidate.confidence ===
+              'high'
+          ) {
+            return {
+              type:
+                'terminal-error',
+
+              error
+            };
+          }
+
+          return {
+            type:
+              'continue'
+          };
+        }
+      }
+
+      async function probeGroup(
+        entries,
+        limit
+      ) {
+        let probed =
+          0;
+
+        for (
+          const candidate of
+          entries
+        ) {
+          if (
+            probed >=
+              limit ||
+            pageAttempts >=
+              maxPageProbes
+          ) {
+            break;
+          }
+
+          if (
+            attemptedSet.has(
+              candidate.url
+            )
+          ) {
+            continue;
+          }
+
+          probed +=
+            1;
+
+          const result =
+            await probeCandidate(
+              candidate
+            );
+
+          if (
+            result.type ===
+              'success' ||
+            result.type ===
+              'terminal-error'
+          ) {
+            return result;
+          }
+        }
+
+        return {
+          type:
+            'continue'
+        };
+      }
+
+      /*
+       * ==================================================
+       * PHASE 1
+       * DIRECT URL
+       * ==================================================
+       *
+       * Ini perubahan penting:
+       * jika direct URL tersedia,
+       * homepage dan sitemap belum
+       * disentuh sama sekali.
+       */
+      const directEntries =
+        makeDirectCandidateEntries(
+          store,
+          game
+        );
+
+      if (
+        directEntries.length
+      ) {
+        const result =
+          await probeGroup(
+            directEntries,
+
+            Math.min(
+              directEntries.length,
+              maxPageProbes
+            )
+          );
+
+        if (
+          result.type ===
+          'success'
+        ) {
+          return result.offers;
+        }
+
+        if (
+          result.type ===
+          'terminal-error'
+        ) {
+          throw result.error;
+        }
+      }
+
+      /*
+       * ==================================================
+       * PHASE 2
+       * HOMEPAGE DISCOVERY
+       * ==================================================
+       *
+       * Homepage hanya dipakai untuk
+       * mencari URL, sehingga tidak
+       * di-retry.
+       */
+      let homepageHtml =
+        '';
+
       if (
         pageAttempts <
-        maxPages
+        maxPageProbes
+      ) {
+        try {
+          const homepage =
+            await fetchText(
+              store.homepage,
+              {
+                timeoutMs:
+                  Math.min(
+                    timeoutMs,
+                    3000
+                  ),
+
+                retries:
+                  0
+              }
+            );
+
+          homepageHtml =
+            homepage.text;
+        } catch (rawError) {
+          homepageError =
+            convertDiscoveryError(
+              rawError
+            );
+
+          strongestError =
+            pickStrongerError(
+              strongestError,
+              homepageError
+            );
+        }
+
+        const discoveredEntries =
+          makeDiscoveredCandidateEntries(
+            store,
+            game,
+            homepageHtml
+          );
+
+        if (
+          discoveredEntries.length
+        ) {
+          const result =
+            await probeGroup(
+              discoveredEntries,
+              maxDiscoveredProbes
+            );
+
+          if (
+            result.type ===
+            'success'
+          ) {
+            return result.offers;
+          }
+
+          if (
+            result.type ===
+            'terminal-error'
+          ) {
+            throw result.error;
+          }
+        }
+      }
+
+      /*
+       * ==================================================
+       * PHASE 3
+       * SITEMAP
+       * ==================================================
+       *
+       * Sitemap hanya fallback.
+       * Tidak di-retry.
+       */
+      if (
+        pageAttempts <
+        maxPageProbes
       ) {
         sitemapDiscovery =
-          await discoverSitemapUrls(
+          await discoverSitemapCandidates(
             store,
             game,
             {
@@ -1767,52 +1863,89 @@ function createUniversalAdapter(
               timeoutMs:
                 Math.min(
                   timeoutMs,
-                  3000
+                  2800
                 ),
 
               maxSitemaps:
                 2,
 
               maxUrls:
-                Math.max(
-                  2,
-
-                  maxPages -
-                    pageAttempts
-                )
+                3
             }
           );
+
+        if (
+          sitemapDiscovery
+            .entries
+            .length
+        ) {
+          const result =
+            await probeGroup(
+              sitemapDiscovery.entries,
+              maxSitemapProbes
+            );
+
+          if (
+            result.type ===
+            'success'
+          ) {
+            return result.offers;
+          }
+
+          if (
+            result.type ===
+            'terminal-error'
+          ) {
+            throw result.error;
+          }
+        }
       }
 
       /*
-       * Sitemap URL diprioritaskan
-       * sebelum sisa guessed URL.
+       * ==================================================
+       * PHASE 4
+       * GUESSED URL
+       * ==================================================
+       *
+       * Fallback terakhir.
+       *
+       * Default:
+       * maksimum 1 candidate
+       * tanpa retry.
        */
-      const remainingCandidates = [
-        ...sitemapDiscovery.urls,
-
-        ...initialCandidates.slice(
-          initialProbeLimit
-        )
-      ];
-
-      const secondResult =
-        await probeUrls(
-          remainingCandidates,
-          maxPages
-        );
-
       if (
-        secondResult
+        pageAttempts <
+          maxPageProbes &&
+        maxGuessedProbes >
+          0
       ) {
-        return secondResult;
+        const guessedEntries =
+          makeGuessedCandidateEntries(
+            store,
+            game
+          );
+
+        const result =
+          await probeGroup(
+            guessedEntries,
+            maxGuessedProbes
+          );
+
+        if (
+          result.type ===
+          'success'
+        ) {
+          return result.offers;
+        }
+
+        if (
+          result.type ===
+          'terminal-error'
+        ) {
+          throw result.error;
+        }
       }
 
-      /*
-       * Homepage error hanya digunakan
-       * jika tidak pernah ada error
-       * candidate yang lebih spesifik.
-       */
       if (
         !strongestError &&
         homepageError
@@ -1821,25 +1954,24 @@ function createUniversalAdapter(
           homepageError;
       }
 
+      const diagnostics = {
+        attemptedUrls,
+        pageAttempts,
+        maxPageProbes,
+
+        sitemapChecked:
+          sitemapDiscovery.checked,
+
+        sitemapErrors:
+          sitemapDiscovery.errors
+      };
+
       if (
         strongestError
       ) {
-        /*
-         * Detail ini tidak harus
-         * ditampilkan ke user,
-         * tetapi sangat membantu
-         * debugging backend.
-         */
-        strongestError.discoveryDiagnostics = {
-          attemptedUrls,
-          pageAttempts,
-
-          sitemapChecked:
-            sitemapDiscovery.checked,
-
-          sitemapErrors:
-            sitemapDiscovery.errors
-        };
+        strongestError
+          .discoveryDiagnostics =
+          diagnostics;
 
         throw strongestError;
       }
@@ -1847,19 +1979,11 @@ function createUniversalAdapter(
       throw providerError(
         'PAGE_NOT_FOUND',
 
-        'Tidak ada candidate URL game yang berhasil ditemukan',
+        'Tidak ada URL game yang berhasil ditemukan dari direct URL, homepage, sitemap, maupun fallback candidate',
 
         {
-          discoveryDiagnostics: {
-            attemptedUrls,
-            pageAttempts,
-
-            sitemapChecked:
-              sitemapDiscovery.checked,
-
-            sitemapErrors:
-              sitemapDiscovery.errors
-          }
+          discoveryDiagnostics:
+            diagnostics
         }
       );
     }
