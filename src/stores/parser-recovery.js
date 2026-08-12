@@ -1,8 +1,6 @@
 'use strict';
 
-const {
-  fetchText
-} = require('../services/http');
+const { fetchText } = require('../services/http');
 
 const {
   validatePageForGame,
@@ -31,11 +29,25 @@ const {
   detectDynamicPageSignals
 } = require('../utils/structured-data');
 
+const RECOVERY_VERSION =
+  '2026-08-12-v3';
+
 /*
- * Recovery hanya aktif untuk toko yang memang membutuhkan
- * fallback tambahan. Store lain tetap memakai flow normal.
+ * ============================================================
+ * PARSER RECOVERY
+ * ============================================================
+ *
+ * Recovery hanya aktif untuk toko yang memang pernah
+ * membutuhkan fallback tambahan.
+ *
+ * Store lainnya tetap memakai universal parser normal.
  */
 const RECOVERY_CONFIG = {
+  /*
+   * ========================================================
+   * GIGAMES
+   * ========================================================
+   */
   gigames: {
     paths: [
       '/beli/{gameSlug}',
@@ -51,23 +63,34 @@ const RECOVERY_CONFIG = {
     },
 
     /*
-     * /services merupakan fallback Gigames karena halaman ini
-     * dapat menampilkan nama game + nominal + harga.
+     * Homepage Gigames juga dapat mempunyai card:
+     *
+     * Mobile Legends
+     * 12 Diamond
+     * Rp ...
+     *
+     * sehingga boleh digunakan sebagai catalog fallback.
      */
     catalogPaths: [
+      '/en',
+      '/id',
       '/services'
     ],
 
     discoveryPaths: [
-      '/en',
-      '/id',
       '/'
     ],
 
     maxProbes: 9,
+
     linkThreshold: 68
   },
 
+  /*
+   * ========================================================
+   * OURA STORE
+   * ========================================================
+   */
   'oura-store': {
     paths: [
       '/id-id/{gameSlug}',
@@ -77,8 +100,8 @@ const RECOVERY_CONFIG = {
 
     specialPaths: {
       'mobile-legends': [
-        '/id-id/mobile-legends?from=undefined',
-        '/id-id/mobile-legends'
+        '/id-id/mobile-legends',
+        '/id-id/mobile-legends?from=undefined'
       ]
     },
 
@@ -88,9 +111,15 @@ const RECOVERY_CONFIG = {
     ],
 
     maxProbes: 7,
+
     linkThreshold: 72
   },
 
+  /*
+   * ========================================================
+   * SEAGM
+   * ========================================================
+   */
   seagm: {
     paths: [
       '/id-id/{gameSlug}',
@@ -101,7 +130,8 @@ const RECOVERY_CONFIG = {
     specialPaths: {
       'mobile-legends': [
         '/id-id/mlbb-diamonds-top-up-id',
-        '/id-id/mobile-legends-diamonds-top-up'
+        '/id-id/mobile-legends-diamonds-top-up',
+        '/id-id/mobile-legends'
       ]
     },
 
@@ -111,9 +141,15 @@ const RECOVERY_CONFIG = {
     ],
 
     maxProbes: 9,
+
     linkThreshold: 66
   },
 
+  /*
+   * ========================================================
+   * KIOS GAME INDONESIA
+   * ========================================================
+   */
   'kios-game-indonesia': {
     paths: [
       '/{gameSlug}',
@@ -136,9 +172,15 @@ const RECOVERY_CONFIG = {
     ],
 
     maxProbes: 8,
+
     linkThreshold: 66
   },
 
+  /*
+   * ========================================================
+   * TOPUPDEH
+   * ========================================================
+   */
   topupdeh: {
     paths: [
       '/{gameSlug}',
@@ -152,12 +194,82 @@ const RECOVERY_CONFIG = {
     ],
 
     maxProbes: 7,
+
     linkThreshold: 70
   },
 
   /*
-   * Tetap dipertahankan karena dua toko ini pernah masuk
-   * recovery profile.
+   * ========================================================
+   * CASA TOPUP
+   *
+   * Profile lama dipertahankan agar tidak regression.
+   * ========================================================
+   */
+  casatopup: {
+    paths: [
+      '/id/beli/{gameSlug}',
+      '/en-id/beli/{gameSlug}',
+      '/beli/{gameSlug}'
+    ],
+
+    discoveryPaths: [
+      '/id',
+      '/'
+    ],
+
+    maxProbes: 6,
+
+    linkThreshold: 70
+  },
+
+  /*
+   * ========================================================
+   * TOPUPGAMEZ
+   * ========================================================
+   */
+  topupgamez: {
+    paths: [
+      '/beli/{gameSlug}',
+      '/id/beli/{gameSlug}',
+      '/en-id/beli/{gameSlug}'
+    ],
+
+    discoveryPaths: [
+      '/id',
+      '/'
+    ],
+
+    maxProbes: 6,
+
+    linkThreshold: 70
+  },
+
+  /*
+   * ========================================================
+   * BXY STORE
+   * ========================================================
+   */
+  bxystore: {
+    paths: [
+      '/en-id/beli/{gameSlug}',
+      '/id/beli/{gameSlug}',
+      '/beli/{gameSlug}'
+    ],
+
+    discoveryPaths: [
+      '/en-id',
+      '/'
+    ],
+
+    maxProbes: 6,
+
+    linkThreshold: 70
+  },
+
+  /*
+   * ========================================================
+   * SON TOPUP
+   * ========================================================
    */
   sontopup: {
     paths: [
@@ -178,9 +290,15 @@ const RECOVERY_CONFIG = {
     ],
 
     maxProbes: 8,
+
     linkThreshold: 66
   },
 
+  /*
+   * ========================================================
+   * YOGGSTORE
+   * ========================================================
+   */
   yoggstore: {
     paths: [
       '/id/beli/{gameSlug}',
@@ -195,38 +313,60 @@ const RECOVERY_CONFIG = {
     ],
 
     maxProbes: 8,
+
     linkThreshold: 66
   }
 };
 
-const RECOVERABLE_CODES = new Set([
-  'PARSER_FAILED',
-  'PAGE_NOT_VERIFIED',
-  'PAGE_NOT_FOUND'
-]);
+const RECOVERABLE_CODES =
+  new Set([
+    'PARSER_FAILED',
+    'PAGE_NOT_VERIFIED',
+    'PAGE_NOT_FOUND'
+  ]);
 
-const IGNORABLE_BETWEEN_PRODUCT_AND_PRICE = [
+/*
+ * Baris seperti ini boleh berada di antara
+ * product name dengan price.
+ */
+const IGNORABLE_LINES = [
   /^promo$/i,
   /^termurah$/i,
   /^limited$/i,
   /^event$/i,
   /^best seller$/i,
+
   /^diskon\b/i,
   /^discount\b/i,
+
+  /^khusus\b/i,
+
   /^\+?\d[\d.,]*\s*points?$/i,
+
   /^\d+\s*(?:item|items)$/i,
+
   /^\d[\d.,]*\s*\+\s*\d[\d.,]*\s*(?:bonus)?$/i,
-  /^khusus\b/i
+
+  /^\d[\d.,]*\s*\+\s*\d[\d.,]*\s*bonus\b/i
 ];
 
+/*
+ * ============================================================
+ * ERROR
+ * ============================================================
+ */
 function providerError(
   code,
   message,
   details = {}
 ) {
-  const error = new Error(message);
+  const error =
+    new Error(
+      message
+    );
 
-  error.code = code;
+  error.code =
+    code;
 
   Object.assign(
     error,
@@ -236,9 +376,18 @@ function providerError(
   return error;
 }
 
-function safeOrigin(value) {
+/*
+ * ============================================================
+ * URL HELPERS
+ * ============================================================
+ */
+function safeOrigin(
+  value
+) {
   try {
-    return new URL(value).origin;
+    return new URL(
+      value
+    ).origin;
   } catch {
     return null;
   }
@@ -258,7 +407,9 @@ function sameOrigin(
   }
 }
 
-function gameQuery(game) {
+function gameQuery(
+  game
+) {
   return encodeURIComponent(
     String(
       game?.shortName ||
@@ -286,17 +437,21 @@ function expandPath(
   try {
     const value =
       String(
-        path || ''
+        path ||
+        ''
       )
         .replaceAll(
           '{gameSlug}',
           String(
-            game?.id || ''
+            game?.id ||
+            ''
           )
         )
         .replaceAll(
           '{gameQuery}',
-          gameQuery(game)
+          gameQuery(
+            game
+          )
         );
 
     return new URL(
@@ -308,14 +463,55 @@ function expandPath(
   }
 }
 
-function uniqueEntries(entries) {
-  const seen = new Set();
+function makeEntries(
+  paths,
+  store,
+  game,
+  mode
+) {
+  return (
+    paths ||
+    []
+  )
+    .map(
+      (
+        path
+      ) => ({
+        url:
+          expandPath(
+            path,
+            store,
+            game
+          ),
+
+        mode
+      })
+    )
+    .filter(
+      (
+        entry
+      ) =>
+        Boolean(
+          entry.url
+        )
+    );
+}
+
+function uniqueEntries(
+  entries
+) {
+  const seen =
+    new Set();
 
   return entries.filter(
-    (entry) => {
+    (
+      entry
+    ) => {
       if (
         !entry?.url ||
-        seen.has(entry.url)
+        seen.has(
+          entry.url
+        )
       ) {
         return false;
       }
@@ -329,57 +525,30 @@ function uniqueEntries(entries) {
   );
 }
 
-function makeEntries(
-  paths,
-  store,
-  game,
-  mode
-) {
-  return (
-    paths || []
-  )
-    .map(
-      (path) => ({
-        url:
-          expandPath(
-            path,
-            store,
-            game
-          ),
-
-        mode
-      })
-    )
-    .filter(
-      (entry) =>
-        Boolean(
-          entry.url
-        )
-    );
-}
-
 function makeInitialQueue(
   store,
   game,
   config
 ) {
-  const special =
+  const specialPaths =
     config
       .specialPaths
-      ?.[game?.id] ||
+      ?.[
+        game?.id
+      ] ||
     [];
 
   /*
    * Priority:
    *
-   * 1. URL khusus game
-   * 2. URL product generic
-   * 3. catalog scoped
-   * 4. halaman discovery
+   * 1. exact/special game page
+   * 2. generic product page
+   * 3. catalog page
+   * 4. discovery page
    */
   return uniqueEntries([
     ...makeEntries(
-      special,
+      specialPaths,
       store,
       game,
       'page'
@@ -408,6 +577,11 @@ function makeInitialQueue(
   ]);
 }
 
+/*
+ * ============================================================
+ * URL DISCOVERY
+ * ============================================================
+ */
 function discoveredLinks(
   html,
   baseUrl,
@@ -425,7 +599,9 @@ function discoveredLinks(
     baseUrl
   )
     .filter(
-      (link) =>
+      (
+        link
+      ) =>
         link?.href &&
         origin &&
         sameOrigin(
@@ -434,7 +610,9 @@ function discoveredLinks(
         )
     )
     .map(
-      (link) => ({
+      (
+        link
+      ) => ({
         ...link,
 
         score:
@@ -446,25 +624,85 @@ function discoveredLinks(
       })
     )
     .filter(
-      (link) =>
+      (
+        link
+      ) =>
         link.score >=
         threshold
     )
     .sort(
-      (a, b) =>
-        b.score -
-        a.score
+      (
+        left,
+        right
+      ) =>
+        right.score -
+        left.score
     )
     .slice(
       0,
-      6
+      8
     )
     .map(
-      (link) =>
+      (
+        link
+      ) =>
         link.href
     );
 }
 
+function enqueueDiscovered(
+  queue,
+  attempted,
+  urls
+) {
+  const queued =
+    new Set(
+      queue.map(
+        (
+          entry
+        ) =>
+          entry.url
+      )
+    );
+
+  const additions =
+    urls
+      .filter(
+        (
+          url
+        ) =>
+          !attempted.has(
+            url
+          ) &&
+          !queued.has(
+            url
+          )
+      )
+      .map(
+        (
+          url
+        ) => ({
+          url,
+
+          mode:
+            'page'
+        })
+      );
+
+  /*
+   * Discovered game page diprioritaskan
+   * dibanding seed berikutnya.
+   */
+  queue.unshift(
+    ...additions
+  );
+}
+
+/*
+ * ============================================================
+ * GAME MATCHING
+ * ============================================================
+ */
 function normalizedGameIdentities(
   game
 ) {
@@ -478,9 +716,12 @@ function normalizedGameIdentities(
       normalizeText
     )
     .filter(
-      (value) =>
+      (
+        value
+      ) =>
         value &&
-        value.length >= 4
+        value.length >=
+          4
     );
 }
 
@@ -488,13 +729,16 @@ function normalizedUnits(
   game
 ) {
   return (
-    game?.unitAliases ||
+    game
+      ?.unitAliases ||
     []
   )
     .map(
       normalizeText
     )
-    .filter(Boolean);
+    .filter(
+      Boolean
+    );
 }
 
 function containsNormalizedPhrase(
@@ -502,13 +746,19 @@ function containsNormalizedPhrase(
   phrase
 ) {
   const haystack =
-    ` ${normalizeText(text)} `;
+    ` ${normalizeText(
+      text
+    )} `;
 
   const needle =
-    ` ${normalizeText(phrase)} `;
+    ` ${normalizeText(
+      phrase
+    )} `;
 
   return (
-    needle.trim().length >
+    needle
+      .trim()
+      .length >
       1 &&
     haystack.includes(
       needle
@@ -524,7 +774,9 @@ function explicitGameMatch(
     game
   )
     .some(
-      (identity) =>
+      (
+        identity
+      ) =>
         containsNormalizedPhrase(
           text,
           identity
@@ -540,7 +792,9 @@ function unitMatch(
     game
   )
     .some(
-      (unit) =>
+      (
+        unit
+      ) =>
         containsNormalizedPhrase(
           text,
           unit
@@ -553,40 +807,62 @@ function namedPackageMatchesGame(
   game
 ) {
   const value =
-    normalizeText(text);
+    normalizeText(
+      text
+    );
 
+  /*
+   * Mobile Legends
+   */
   if (
     game?.id ===
       'mobile-legends' &&
     /\b(?:weekly diamond(?:s)? pass|weekly pass|weekly elite|monthly elite|starlight|twilight pass)\b/i
-      .test(value)
+      .test(
+        value
+      )
   ) {
     return true;
   }
 
+  /*
+   * Genshin
+   */
   if (
     game?.id ===
       'genshin-impact' &&
     /\b(?:welkin|blessing of the welkin moon)\b/i
-      .test(value)
+      .test(
+        value
+      )
   ) {
     return true;
   }
 
+  /*
+   * Honkai Star Rail
+   */
   if (
     game?.id ===
       'honkai-star-rail' &&
     /\bexpress supply pass\b/i
-      .test(value)
+      .test(
+        value
+      )
   ) {
     return true;
   }
 
+  /*
+   * Wuthering Waves
+   */
   if (
     game?.id ===
       'wuthering-waves' &&
     /\blunite subscription\b/i
-      .test(value)
+      .test(
+        value
+      )
   ) {
     return true;
   }
@@ -598,8 +874,11 @@ function recoveryNameMatchesGame(
   name,
   game,
   {
-    pageIsVerified = false,
-    scopedToGame = false
+    pageIsVerified =
+      false,
+
+    scopedToGame =
+      false
   } = {}
 ) {
   if (
@@ -611,25 +890,18 @@ function recoveryNameMatchesGame(
     return true;
   }
 
+  /*
+   * "Diamonds" saja belum cukup karena dipakai
+   * banyak game.
+   *
+   * Unit boleh dipakai hanya jika page sudah
+   * terverifikasi atau catalog scope sudah terkunci.
+   */
   if (
     unitMatch(
       name,
       game
-    )
-  ) {
-    /*
-     * Unit seperti "Diamonds" dapat dipakai banyak game.
-     * Karena itu hanya diterima jika halaman sudah
-     * tervalidasi atau parser sedang berada dalam scope
-     * game tertentu.
-     */
-    return (
-      pageIsVerified ||
-      scopedToGame
-    );
-  }
-
-  if (
+    ) ||
     namedPackageMatchesGame(
       name,
       game
@@ -645,27 +917,32 @@ function recoveryNameMatchesGame(
 }
 
 function isRecoveryProductName(
-  line,
+  value,
   game
 ) {
-  if (
-    isProductName(line)
-  ) {
-    return true;
-  }
-
-  return namedPackageMatchesGame(
-    line,
-    game
+  return (
+    isProductName(
+      value
+    ) ||
+    namedPackageMatchesGame(
+      value,
+      game
+    )
   );
 }
 
+/*
+ * ============================================================
+ * PRICE PARSING
+ * ============================================================
+ */
 function isIgnorableLine(
-  line
+  value
 ) {
-  const value =
+  const text =
     String(
-      line || ''
+      value ||
+      ''
     )
       .replace(
         /\s+/g,
@@ -673,15 +950,128 @@ function isIgnorableLine(
       )
       .trim();
 
-  return (
-    IGNORABLE_BETWEEN_PRODUCT_AND_PRICE
-      .some(
-        (pattern) =>
-          pattern.test(value)
+  return IGNORABLE_LINES
+    .some(
+      (
+        pattern
+      ) =>
+        pattern.test(
+          text
+        )
+    );
+}
+
+/*
+ * Recovery melakukan normalisasi lokal.
+ *
+ * Ini membuat format berikut tetap terbaca:
+ *
+ * Rp 1.000
+ * Rp. 1.000
+ * Rp . 1.000
+ * Rp: 1.000
+ * IDR 1000
+ * IDR: 1000
+ *
+ * sehingga tidak bergantung pada money.js
+ * terbaru.
+ */
+function parseRecoveryRupiah(
+  value
+) {
+  const normalized =
+    String(
+      value ??
+      ''
+    )
+      .replace(
+        /\u00a0/g,
+        ' '
       )
+      .replace(
+        /[\u2007\u202f]/g,
+        ' '
+      )
+      .replace(
+        /\bRp\s*\.\s*/gi,
+        'Rp '
+      )
+      .replace(
+        /\bRp\s*:\s*/gi,
+        'Rp '
+      )
+      .replace(
+        /\bIDR\s*:\s*/gi,
+        'IDR '
+      )
+      .trim();
+
+  return parseRupiah(
+    normalized
   );
 }
 
+function firstRupiahFromLine(
+  line
+) {
+  const text =
+    String(
+      line ||
+      ''
+    );
+
+  /*
+   * Harga pertama dianggap selling/current price.
+   *
+   * Contoh Kios Game:
+   *
+   * Rp 1.099 Rp 1.209
+   *
+   * menghasilkan 1099.
+   */
+  const matches =
+    text.match(
+      /(?:\bIDR\b|\bRp\s*\.?)\s*[:=\-]?\s*[0-9][0-9.,]*/gi
+    );
+
+  if (
+    !matches
+      ?.length
+  ) {
+    return null;
+  }
+
+  for (
+    const token
+    of matches
+  ) {
+    const price =
+      parseRecoveryRupiah(
+        token
+      );
+
+    if (
+      price &&
+      price >
+        0
+    ) {
+      return {
+        price,
+
+        priceText:
+          token
+      };
+    }
+  }
+
+  return null;
+}
+
+/*
+ * ============================================================
+ * OFFER
+ * ============================================================
+ */
 function createOffer(
   store,
   game,
@@ -708,7 +1098,9 @@ function createOffer(
       game.id,
 
     originalName:
-      String(name)
+      String(
+        name
+      )
         .replace(
           /\s+/g,
           ' '
@@ -734,18 +1126,31 @@ function createOffer(
 
     checkedAt:
       new Date()
-        .toISOString()
+        .toISOString(),
+
+    accessStrategy:
+      'parser-recovery',
+
+    recoveryVersion:
+      RECOVERY_VERSION
   };
 }
 
+/*
+ * ============================================================
+ * VISIBLE DOM PARSER
+ * ============================================================
+ */
 function findPriceAfter(
   lines,
   productIndex,
-  maxDistance = 7
+  maxDistance = 8
 ) {
   const end =
     Math.min(
-      lines.length - 1,
+      lines.length -
+        1,
+
       productIndex +
         maxDistance
     );
@@ -753,12 +1158,22 @@ function findPriceAfter(
   for (
     let cursor =
       productIndex;
-    cursor <= end;
-    cursor += 1
+
+    cursor <=
+      end;
+
+    cursor +=
+      1
   ) {
     const line =
-      lines[cursor];
+      lines[
+        cursor
+      ];
 
+    /*
+     * Promo / Bonus / Points tidak menghentikan
+     * pencarian harga.
+     */
     if (
       cursor >
         productIndex &&
@@ -769,6 +1184,10 @@ function findPriceAfter(
       continue;
     }
 
+    /*
+     * Jangan mengambil harga dari product card
+     * berikutnya.
+     */
     if (
       cursor >
         productIndex &&
@@ -776,32 +1195,18 @@ function findPriceAfter(
         line
       )
     ) {
-      /*
-       * Jangan menyeberang ke product card berikutnya.
-       */
       break;
     }
 
+    const result =
+      firstRupiahFromLine(
+        line
+      );
+
     if (
-      /(?:\bIDR\b|\bRp\s*\.?)/i
-        .test(line)
+      result
     ) {
-      const price =
-        parseRupiah(
-          line
-        );
-
-      if (
-        price &&
-        price > 0
-      ) {
-        return {
-          price,
-
-          priceText:
-            line
-        };
-      }
+      return result;
     }
   }
 
@@ -814,8 +1219,12 @@ function parseTolerantVisibleOffers(
   store,
   game,
   {
-    pageIsVerified = false,
-    scopedToGame = false,
+    pageIsVerified =
+      false,
+
+    scopedToGame =
+      false,
+
     source =
       'recovery-visible'
   } = {}
@@ -825,16 +1234,23 @@ function parseTolerantVisibleOffers(
       html
     );
 
-  const offers = [];
+  const offers =
+    [];
 
   for (
-    let index = 0;
+    let index =
+      0;
+
     index <
       lines.length;
-    index += 1
+
+    index +=
+      1
   ) {
     const name =
-      lines[index];
+      lines[
+        index
+      ];
 
     if (
       !isRecoveryProductName(
@@ -879,10 +1295,12 @@ function parseTolerantVisibleOffers(
           name,
 
           price:
-            priceResult.price,
+            priceResult
+              .price,
 
           priceText:
-            priceResult.priceText,
+            priceResult
+              .priceText,
 
           purchaseUrl:
             finalUrl,
@@ -902,18 +1320,24 @@ function parseTolerantVisibleOffers(
   );
 }
 
+/*
+ * ============================================================
+ * SERIALIZED / HYDRATION STATE
+ * ============================================================
+ */
 function decodeSerializedText(
   html
 ) {
   /*
-   * Tidak mengeksekusi JavaScript.
+   * Tidak menjalankan JavaScript.
    *
-   * Kita hanya mengubah serialized framework payload
-   * menjadi teks yang lebih mudah diparsing.
+   * Script/framework payload hanya dinormalisasi
+   * menjadi plain text.
    */
   return decodeEntities(
     String(
-      html || ''
+      html ||
+      ''
     )
       .replace(
         /\\u00a0/gi,
@@ -985,33 +1409,53 @@ function decodeSerializedText(
 function extractQuotedNameCandidates(
   text
 ) {
-  const candidates = [];
+  const candidates =
+    [];
 
-  const keyPattern =
+  /*
+   * Support berbagai naming convention:
+   *
+   * productName
+   * product_name
+   * variantName
+   * itemName
+   * denomination
+   * title
+   * label
+   * name
+   */
+  const pattern =
     /["']?(?:productName|product_name|denomination|variantName|variant_name|itemName|item_name|title|label|name)["']?\s*[:=]\s*["']([^"'\\]{2,180})["']/gi;
 
   for (
-    const match of
-    text.matchAll(
-      keyPattern
+    const match
+    of text.matchAll(
+      pattern
     )
   ) {
     candidates.push({
       name:
-        match[1],
+        match[
+          1
+        ],
 
       start:
         match.index ||
         0,
 
       end:
-        (match.index || 0) +
-        match[0].length
+        (
+          match.index ||
+          0
+        ) +
+        match[
+          0
+        ].length
     });
 
     if (
       candidates.length >=
-      400
+      500
     ) {
       break;
     }
@@ -1024,91 +1468,125 @@ function extractHumanProductCandidates(
   text,
   game
 ) {
-  const candidates = [];
+  const candidates =
+    [];
 
-  const unitTokens =
+  const units =
     (
-      game?.unitAliases ||
+      game
+        ?.unitAliases ||
       []
     )
       .map(
-        (unit) =>
-          String(unit)
+        (
+          unit
+        ) =>
+          String(
+            unit
+          )
             .trim()
       )
-      .filter(Boolean)
+      .filter(
+        Boolean
+      )
       .map(
-        (unit) =>
+        (
+          unit
+        ) =>
           unit.replace(
             /[.*+?^${}()|[\]\\]/g,
             '\\$&'
           )
       );
 
+  /*
+   * Contoh:
+   *
+   * 5 Diamonds
+   * 12 Diamonds
+   * 277 (250+27) Diamonds
+   */
   if (
-    unitTokens.length
+    units.length
   ) {
-    const unitPattern =
-      unitTokens.join('|');
-
-    const regex =
+    const pattern =
       new RegExp(
-        `\\b\\d[\\d.,]*(?:\\s*\\([^\\n]{0,60}\\))?(?:\\s*\\+\\s*\\d[\\d.,]*)?\\s*(?:${unitPattern})\\b`,
+        `\\b\\d[\\d.,]*(?:\\s*\\([^\\n]{0,60}\\))?(?:\\s*\\+\\s*\\d[\\d.,]*)?\\s*(?:${units.join(
+          '|'
+        )})\\b`,
         'gi'
       );
 
     for (
-      const match of
-      text.matchAll(
-        regex
+      const match
+      of text.matchAll(
+        pattern
       )
     ) {
       candidates.push({
         name:
-          match[0],
+          match[
+            0
+          ],
 
         start:
           match.index ||
           0,
 
         end:
-          (match.index || 0) +
-          match[0].length
+          (
+            match.index ||
+            0
+          ) +
+          match[
+            0
+          ].length
       });
 
       if (
         candidates.length >=
-          400
+        500
       ) {
         break;
       }
     }
   }
 
+  /*
+   * Mobile Legends mempunyai package yang
+   * tidak selalu menggunakan kata Diamonds.
+   */
   if (
     game?.id ===
-      'mobile-legends'
+    'mobile-legends'
   ) {
-    const packageRegex =
+    const packages =
       /\b(?:\d+x\s+)?(?:weekly diamond(?:s)? pass|weekly pass|weekly elite(?: pack)?|monthly elite(?: pack)?|starlight(?: member)?|twilight pass)\b/gi;
 
     for (
-      const match of
-      text.matchAll(
-        packageRegex
+      const match
+      of text.matchAll(
+        packages
       )
     ) {
       candidates.push({
         name:
-          match[0],
+          match[
+            0
+          ],
 
         start:
           match.index ||
           0,
 
         end:
-          (match.index || 0) +
-          match[0].length
+          (
+            match.index ||
+            0
+          ) +
+          match[
+            0
+          ].length
       });
     }
   }
@@ -1119,34 +1597,40 @@ function extractHumanProductCandidates(
 function priceCandidatesInWindow(
   windowText
 ) {
-  const candidates = [];
+  const candidates =
+    [];
 
   /*
-   * Explicit Rupiah/IDR adalah kandidat terkuat.
+   * Explicit IDR adalah kandidat terbaik.
    */
-  const rupiahRegex =
+  const explicit =
     /(?:\bIDR\b|\bRp\s*\.?)\s*[:=\-]?\s*[0-9][0-9.,]*/gi;
 
   for (
-    const match of
-    windowText.matchAll(
-      rupiahRegex
+    const match
+    of windowText.matchAll(
+      explicit
     )
   ) {
     const price =
-      parseRupiah(
-        match[0]
+      parseRecoveryRupiah(
+        match[
+          0
+        ]
       );
 
     if (
       price &&
-      price > 0
+      price >
+        0
     ) {
       candidates.push({
         price,
 
         priceText:
-          match[0],
+          match[
+            0
+          ],
 
         offset:
           match.index ||
@@ -1159,33 +1643,40 @@ function priceCandidatesInWindow(
   }
 
   /*
-   * JSON/state sering menyimpan harga sebagai angka tanpa Rp.
+   * Framework state kadang menyimpan:
    *
-   * Hanya field yang namanya jelas berkaitan dengan harga.
+   * price: 1099
+   * sellingPrice: 1099
+   * finalPrice: 1099
    */
-  const keyedPriceRegex =
+  const keyedPrice =
     /["']?(?:sellingPrice|selling_price|sellPrice|sell_price|salePrice|sale_price|finalPrice|final_price|discountPrice|discount_price|productPrice|product_price|price)["']?\s*[:=]\s*["']?([0-9][0-9.,]*)["']?/gi;
 
   for (
-    const match of
-    windowText.matchAll(
-      keyedPriceRegex
+    const match
+    of windowText.matchAll(
+      keyedPrice
     )
   ) {
     const price =
-      parseRupiah(
-        match[1]
+      parseRecoveryRupiah(
+        match[
+          1
+        ]
       );
 
     if (
       price &&
-      price > 0
+      price >
+        0
     ) {
       candidates.push({
         price,
 
         priceText:
-          match[0],
+          match[
+            0
+          ],
 
         offset:
           match.index ||
@@ -1207,6 +1698,7 @@ function nearestPrice(
   const before =
     Math.max(
       0,
+
       candidate.start -
         220
     );
@@ -1214,6 +1706,7 @@ function nearestPrice(
   const after =
     Math.min(
       text.length,
+
       candidate.end +
         420
     );
@@ -1249,6 +1742,10 @@ function nearestPrice(
       left,
       right
     ) => {
+      /*
+       * Explicit Rp / IDR lebih kuat daripada
+       * generic JSON price key.
+       */
       if (
         right.confidence !==
         left.confidence
@@ -1259,6 +1756,10 @@ function nearestPrice(
         );
       }
 
+      /*
+       * Jika confidence sama, ambil yang paling
+       * dekat dengan product name.
+       */
       return (
         Math.abs(
           left.offset -
@@ -1272,7 +1773,9 @@ function nearestPrice(
     }
   );
 
-  return prices[0];
+  return prices[
+    0
+  ];
 }
 
 function parseSerializedOffers(
@@ -1281,8 +1784,11 @@ function parseSerializedOffers(
   store,
   game,
   {
-    pageIsVerified = false,
-    scopedToGame = false
+    pageIsVerified =
+      false,
+
+    scopedToGame =
+      false
   } = {}
 ) {
   const text =
@@ -1301,14 +1807,15 @@ function parseSerializedOffers(
     )
   ];
 
-  const offers = [];
-
-  const seenCandidates =
+  const seen =
     new Set();
 
+  const offers =
+    [];
+
   for (
-    const candidate of
-    candidates
+    const candidate
+    of candidates
   ) {
     const name =
       String(
@@ -1322,18 +1829,20 @@ function parseSerializedOffers(
         .trim();
 
     const key =
-      `${normalizeText(name)}:${candidate.start}`;
+      `${normalizeText(
+        name
+      )}:${candidate.start}`;
 
     if (
       !name ||
-      seenCandidates.has(
+      seen.has(
         key
       )
     ) {
       continue;
     }
 
-    seenCandidates.add(
+    seen.add(
       key
     );
 
@@ -1390,7 +1899,7 @@ function parseSerializedOffers(
 
     if (
       offers.length >=
-      150
+      200
     ) {
       break;
     }
@@ -1401,6 +1910,11 @@ function parseSerializedOffers(
   );
 }
 
+/*
+ * ============================================================
+ * CATALOG PARSER
+ * ============================================================
+ */
 function parseScopedCatalogOffers(
   html,
   finalUrl,
@@ -1412,42 +1926,49 @@ function parseScopedCatalogOffers(
       html
     );
 
-  const offers = [];
+  const offers =
+    [];
 
-  let scopeUntil = -1;
+  /*
+   * Berapa line setelah nama game masih dianggap
+   * bagian dari game tersebut.
+   */
+  let scopeUntil =
+    -1;
 
   for (
-    let index = 0;
+    let index =
+      0;
+
     index <
       lines.length;
-    index += 1
+
+    index +=
+      1
   ) {
     const line =
-      lines[index];
+      lines[
+        index
+      ];
 
+    /*
+     * Contoh:
+     *
+     * Mobile Legends
+     * 12 Diamond
+     * Rp 3.515
+     */
     if (
       explicitGameMatch(
         line,
         game
       )
     ) {
-      /*
-       * Contoh pola:
-       *
-       * Mobile Legends
-       * 3 Diamonds
-       * Rp 1.099
-       *
-       * atau:
-       *
-       * Mobile Legends - 3 Diamonds
-       * Rp 1.099
-       */
       scopeUntil =
         Math.max(
           scopeUntil,
           index +
-            7
+            8
         );
     }
 
@@ -1494,7 +2015,7 @@ function parseScopedCatalogOffers(
       findPriceAfter(
         lines,
         index,
-        6
+        7
       );
 
     if (
@@ -1512,10 +2033,12 @@ function parseScopedCatalogOffers(
             line,
 
           price:
-            priceResult.price,
+            priceResult
+              .price,
 
           priceText:
-            priceResult.priceText,
+            priceResult
+              .priceText,
 
           purchaseUrl:
             finalUrl,
@@ -1532,14 +2055,15 @@ function parseScopedCatalogOffers(
 
     if (
       offers.length >=
-      150
+      200
     ) {
       break;
     }
   }
 
   /*
-   * Serialized fallback juga dicoba pada katalog.
+   * Catalog juga mungkin membawa structured /
+   * hydration payload.
    */
   return dedupeOffers([
     ...offers,
@@ -1557,6 +2081,11 @@ function parseScopedCatalogOffers(
   ]);
 }
 
+/*
+ * ============================================================
+ * SHOULD RECOVER
+ * ============================================================
+ */
 function shouldAttemptParserRecovery(
   store,
   error
@@ -1578,47 +2107,11 @@ function shouldAttemptParserRecovery(
   );
 }
 
-function enqueueDiscovered(
-  queue,
-  attempted,
-  discovered
-) {
-  const current =
-    new Set(
-      queue.map(
-        (entry) =>
-          entry.url
-      )
-    );
-
-  const entries =
-    discovered
-      .filter(
-        (url) =>
-          !attempted.has(
-            url
-          ) &&
-          !current.has(
-            url
-          )
-      )
-      .map(
-        (url) => ({
-          url,
-
-          mode:
-            'page'
-        })
-      );
-
-  /*
-   * Link hasil discovery diprioritaskan.
-   */
-  queue.unshift(
-    ...entries
-  );
-}
-
+/*
+ * ============================================================
+ * RECOVERY EXECUTOR
+ * ============================================================
+ */
 async function tryParserRecovery(
   store,
   game,
@@ -1630,7 +2123,9 @@ async function tryParserRecovery(
       store?.id
     ];
 
-  if (!config) {
+  if (
+    !config
+  ) {
     throw (
       originalError ||
       providerError(
@@ -1643,8 +2138,10 @@ async function tryParserRecovery(
   const timeoutMs =
     Math.max(
       2500,
+
       Math.min(
         9000,
+
         Number(
           options.timeoutMs ||
           6500
@@ -1655,8 +2152,10 @@ async function tryParserRecovery(
   const maxProbes =
     Math.max(
       2,
+
       Math.min(
         10,
+
         Number(
           config.maxProbes ||
           6
@@ -1711,6 +2210,11 @@ async function tryParserRecovery(
     );
 
     try {
+      /*
+       * ======================================================
+       * FETCH
+       * ======================================================
+       */
       const page =
         await fetchText(
           candidateUrl,
@@ -1731,6 +2235,11 @@ async function tryParserRecovery(
         page.finalUrl ||
         candidateUrl;
 
+      /*
+       * ======================================================
+       * DISCOVER MORE PRODUCT URLS
+       * ======================================================
+       */
       const discovered =
         discoveredLinks(
           page.text,
@@ -1747,15 +2256,18 @@ async function tryParserRecovery(
       );
 
       /*
-       * ==================================================
-       * DISCOVERY MODE
-       * ==================================================
+       * ======================================================
+       * DISCOVERY ONLY
+       * ======================================================
        */
       if (
         candidate.mode ===
         'discovery'
       ) {
         diagnostics.push({
+          recoveryVersion:
+            RECOVERY_VERSION,
+
           url:
             candidateUrl,
 
@@ -1775,14 +2287,14 @@ async function tryParserRecovery(
       }
 
       /*
-       * ==================================================
-       * CATALOG MODE
-       * ==================================================
+       * ======================================================
+       * CATALOG
+       * ======================================================
        *
-       * Tidak menjalankan page-level validation karena
-       * katalog dapat berisi banyak game.
+       * Catalog tidak memakai validatePageForGame karena
+       * satu page dapat berisi banyak game.
        *
-       * Parser mengunci scope pada game target.
+       * Sebagai gantinya parser melakukan scoped matching.
        */
       if (
         candidate.mode ===
@@ -1797,6 +2309,9 @@ async function tryParserRecovery(
           );
 
         diagnostics.push({
+          recoveryVersion:
+            RECOVERY_VERSION,
+
           url:
             candidateUrl,
 
@@ -1807,7 +2322,7 @@ async function tryParserRecovery(
 
           result:
             catalogOffers.length
-              ? 'SUCCESS'
+              ? 'SUCCESS_CATALOG'
               : 'CATALOG_NO_MATCH',
 
           offerCount:
@@ -1820,23 +2335,16 @@ async function tryParserRecovery(
         if (
           catalogOffers.length
         ) {
-          return catalogOffers.map(
-            (offer) => ({
-              ...offer,
-
-              accessStrategy:
-                'parser-recovery'
-            })
-          );
+          return catalogOffers;
         }
 
         continue;
       }
 
       /*
-       * ==================================================
-       * PRODUCT PAGE MODE
-       * ==================================================
+       * ======================================================
+       * VERIFY PRODUCT PAGE
+       * ======================================================
        */
       const validation =
         validatePageForGame(
@@ -1850,6 +2358,9 @@ async function tryParserRecovery(
         !validation.ok
       ) {
         diagnostics.push({
+          recoveryVersion:
+            RECOVERY_VERSION,
+
           url:
             candidateUrl,
 
@@ -1893,9 +2404,11 @@ async function tryParserRecovery(
       }
 
       /*
-       * ==================================================
-       * 1. UNIVERSAL PARSER EXISTING
-       * ==================================================
+       * ======================================================
+       * PARSER #1
+       *
+       * Existing Universal Parser
+       * ======================================================
        */
       const parsed =
         parseOffers(
@@ -1906,9 +2419,14 @@ async function tryParserRecovery(
         );
 
       if (
-        parsed.offers.length
+        parsed
+          .offers
+          .length
       ) {
         diagnostics.push({
+          recoveryVersion:
+            RECOVERY_VERSION,
+
           url:
             candidateUrl,
 
@@ -1921,31 +2439,47 @@ async function tryParserRecovery(
             'SUCCESS_UNIVERSAL',
 
           offerCount:
-            parsed.offers.length
+            parsed
+              .offers
+              .length
         });
 
-        return parsed.offers.map(
-          (offer) => ({
-            ...offer,
+        return parsed
+          .offers
+          .map(
+            (
+              offer
+            ) => ({
+              ...offer,
 
-            accessStrategy:
-              'parser-recovery'
-          })
-        );
+              accessStrategy:
+                offer.accessStrategy ||
+                'parser-recovery',
+
+              recoveryVersion:
+                RECOVERY_VERSION
+            })
+          );
       }
 
       /*
-       * ==================================================
-       * 2. TOLERANT VISIBLE PARSER
-       * ==================================================
+       * ======================================================
+       * PARSER #2
        *
-       * Menangani pola seperti:
+       * Tolerant Visible Parser
+       * ======================================================
        *
-       * 5 Diamonds
-       * Diskon
-       * Rp 1.900
+       * Menangani:
        *
-       * atau variasi text node lain.
+       * 3 Diamonds
+       * 3 + 0 Bonus
+       * Rp 1.099 Rp 1.209
+       *
+       * atau:
+       *
+       * Weekly Pass
+       * Promo
+       * Rp 27.900
        */
       const visibleOffers =
         parseTolerantVisibleOffers(
@@ -1963,6 +2497,9 @@ async function tryParserRecovery(
         visibleOffers.length
       ) {
         diagnostics.push({
+          recoveryVersion:
+            RECOVERY_VERSION,
+
           url:
             candidateUrl,
 
@@ -1984,24 +2521,25 @@ async function tryParserRecovery(
             null
         });
 
-        return visibleOffers.map(
-          (offer) => ({
-            ...offer,
-
-            accessStrategy:
-              'parser-recovery'
-          })
-        );
+        return visibleOffers;
       }
 
       /*
-       * ==================================================
-       * 3. SERIALIZED / HYDRATION PARSER
-       * ==================================================
+       * ======================================================
+       * PARSER #3
        *
-       * Menangani Next.js, React hydration, Nuxt,
-       * JSON/script state, dan payload lain yang membawa
-       * product + price tetapi belum muncul di visible DOM.
+       * Serialized / Hydration Parser
+       * ======================================================
+       *
+       * Digunakan jika product data ada pada:
+       *
+       * React state
+       * Next data
+       * Nuxt state
+       * JSON-like script
+       * hydration payload
+       *
+       * tetapi belum tampil sebagai DOM text biasa.
        */
       const serializedOffers =
         parseSerializedOffers(
@@ -2021,6 +2559,9 @@ async function tryParserRecovery(
         );
 
       diagnostics.push({
+        recoveryVersion:
+          RECOVERY_VERSION,
+
         url:
           candidateUrl,
 
@@ -2059,16 +2600,14 @@ async function tryParserRecovery(
       if (
         serializedOffers.length
       ) {
-        return serializedOffers.map(
-          (offer) => ({
-            ...offer,
-
-            accessStrategy:
-              'parser-recovery'
-          })
-        );
+        return serializedOffers;
       }
 
+      /*
+       * ======================================================
+       * NOTHING PARSED
+       * ======================================================
+       */
       strongestError =
         pickStrongerError(
           strongestError,
@@ -2092,15 +2631,21 @@ async function tryParserRecovery(
                 ),
 
               parserDiagnostics:
-                parsed.diagnostics,
+                parsed
+                  .diagnostics,
 
               dynamicDiagnostics:
                 dynamic
             }
           )
         );
-    } catch (error) {
+    } catch (
+      error
+    ) {
       diagnostics.push({
+        recoveryVersion:
+          RECOVERY_VERSION,
+
         url:
           candidateUrl,
 
@@ -2114,6 +2659,10 @@ async function tryParserRecovery(
 
         status:
           error?.status ??
+          null,
+
+        message:
+          error?.message ||
           null
       });
 
@@ -2124,8 +2673,8 @@ async function tryParserRecovery(
         );
 
       /*
-       * Jangan memaksa request tambahan ketika server
-       * melakukan rate limit atau access block.
+       * Jika server secara eksplisit rate limit
+       * atau memblokir request, jangan menambah probe.
        */
       if (
         [
@@ -2144,6 +2693,11 @@ async function tryParserRecovery(
     }
   }
 
+  /*
+   * ==========================================================
+   * ALL RECOVERY FAILED
+   * ==========================================================
+   */
   const finalError =
     strongestError ||
     providerError(
@@ -2151,8 +2705,20 @@ async function tryParserRecovery(
       'Parser recovery tidak menemukan offer yang dapat digunakan'
     );
 
+  /*
+   * Version marker sengaja dimasukkan.
+   *
+   * Kalau response masih tidak memiliki:
+   *
+   * recoveryVersion: "2026-08-12-v3"
+   *
+   * berarti deployment belum menggunakan file ini.
+   */
   finalError
     .parserRecoveryDiagnostics = {
+      recoveryVersion:
+        RECOVERY_VERSION,
+
       storeId:
         store.id,
 
@@ -2162,10 +2728,9 @@ async function tryParserRecovery(
 
       maxProbes,
 
-      attemptedUrls:
-        [
-          ...attempted
-        ],
+      attemptedUrls: [
+        ...attempted
+      ],
 
       attempts:
         diagnostics
@@ -2174,16 +2739,26 @@ async function tryParserRecovery(
   throw finalError;
 }
 
+/*
+ * ============================================================
+ * EXPORT
+ * ============================================================
+ */
 module.exports = {
+  RECOVERY_VERSION,
+
   RECOVERY_CONFIG,
+
   shouldAttemptParserRecovery,
+
   tryParserRecovery,
 
   /*
-   * Export helper agar dapat digunakan
-   * oleh regression/unit test.
+   * Helper diexport untuk regression test.
    */
   parseTolerantVisibleOffers,
+
   parseSerializedOffers,
+
   parseScopedCatalogOffers
 };
