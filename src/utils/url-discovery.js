@@ -2,15 +2,11 @@
 
 const {
   decodeEntities
-} = require(
-  './html'
-);
+} = require('./html');
 
 const {
   normalizeText
-} = require(
-  '../config/games'
-);
+} = require('../config/games');
 
 const COMMON_TEMPLATES = [
   '{homepage}/{gameSlug}',
@@ -33,13 +29,14 @@ function absoluteUrl(
   value,
   baseUrl
 ) {
+  if (!value) {
+    return null;
+  }
+
   try {
     const url =
       new URL(
-        String(
-          value ||
-          ''
-        ),
+        String(value),
         baseUrl
       );
 
@@ -95,16 +92,13 @@ function extractLinks(
     String(
       html ||
       ''
-    ).matchAll(
-      regex
-    )
+    ).matchAll(regex)
   ) {
     const href =
       absoluteUrl(
         match[1] ||
         match[2] ||
         match[3],
-
         baseUrl
       );
 
@@ -125,18 +119,6 @@ function extractLinks(
   return links;
 }
 
-function slugify(
-  value
-) {
-  return normalizeText(
-    value
-  )
-    .replace(
-      /\s+/g,
-      '-'
-    );
-}
-
 function uniqueNormalized(
   values
 ) {
@@ -151,39 +133,22 @@ function uniqueNormalized(
     values
   ) {
     const normalized =
-      normalizeText(
-        value
-      );
+      normalizeText(value);
 
     if (
       !normalized ||
-      seen.has(
-        normalized
-      )
+      seen.has(normalized)
     ) {
       continue;
     }
 
-    seen.add(
-      normalized
-    );
-
-    result.push(
-      normalized
-    );
+    seen.add(normalized);
+    result.push(normalized);
   }
 
   return result;
 }
 
-/*
- * Identity game sengaja tidak
- * menggunakan currency sebagai bukti.
- *
- * Contoh:
- * Lunite bukan identity Wuthering Waves.
- * Diamonds bukan identity Mobile Legends.
- */
 function gameIdentityCandidates(
   game
 ) {
@@ -203,15 +168,11 @@ function gameIdentityCandidates(
       .filter(
         (alias) => {
           const normalized =
-            normalizeText(
-              alias
-            );
+            normalizeText(alias);
 
           if (
             !normalized ||
-            unitSet.has(
-              normalized
-            )
+            unitSet.has(normalized)
           ) {
             return false;
           }
@@ -249,35 +210,20 @@ function isStrongIdentity(
   value
 ) {
   const normalized =
-    normalizeText(
-      value
-    );
+    normalizeText(value);
 
   if (!normalized) {
     return false;
   }
 
-  const compact =
-    normalized.replace(
-      /\s+/g,
-      ''
-    );
-
-  const tokenCount =
-    normalized
-      .split(
-        /\s+/
-      )
-      .filter(
-        Boolean
-      )
-      .length;
-
   return (
-    tokenCount >=
-      2 ||
-    compact.length >=
-      4
+    normalized
+      .split(/\s+/)
+      .filter(Boolean)
+      .length >= 2 ||
+    normalized
+      .replace(/\s+/g, '')
+      .length >= 4
   );
 }
 
@@ -285,27 +231,20 @@ function containsPhrase(
   haystack,
   phrase
 ) {
-  const normalizedHaystack =
-    normalizeText(
-      haystack
-    );
+  const h =
+    normalizeText(haystack);
 
-  const normalizedPhrase =
-    normalizeText(
-      phrase
-    );
+  const p =
+    normalizeText(phrase);
 
-  if (
-    !normalizedHaystack ||
-    !normalizedPhrase
-  ) {
+  if (!h || !p) {
     return false;
   }
 
   return (
-    ` ${normalizedHaystack} `
+    ` ${h} `
   ).includes(
-    ` ${normalizedPhrase} `
+    ` ${p} `
   );
 }
 
@@ -326,17 +265,12 @@ function linkScore(
       ''
     );
 
-  const identities =
-    gameIdentityCandidates(
-      game
-    );
-
   let score =
     0;
 
   for (
     const identity of
-    identities
+    gameIdentityCandidates(game)
   ) {
     const compact =
       identity.replace(
@@ -345,9 +279,7 @@ function linkScore(
       );
 
     const strong =
-      isStrongIdentity(
-        identity
-      );
+      isStrongIdentity(identity);
 
     if (
       containsPhrase(
@@ -358,12 +290,9 @@ function linkScore(
       score =
         Math.max(
           score,
-
           strong
-            ? 130 +
-              compact.length
-            : 72 +
-              compact.length
+            ? 130 + compact.length
+            : 72 + compact.length
         );
     }
 
@@ -376,51 +305,34 @@ function linkScore(
       score =
         Math.max(
           score,
-
           strong
-            ? 112 +
-              compact.length
-            : 62 +
-              compact.length
+            ? 112 + compact.length
+            : 62 + compact.length
         );
     }
 
     if (strong) {
-      const compactText =
-        text.replace(
-          /\s+/g,
-          ''
-        );
-
-      const compactHref =
-        href.replace(
-          /\s+/g,
-          ''
-        );
-
       if (
-        compactText.includes(
-          compact
-        )
+        text
+          .replace(/\s+/g, '')
+          .includes(compact)
       ) {
         score =
           Math.max(
             score,
-            118 +
-              compact.length
+            118 + compact.length
           );
       }
 
       if (
-        compactHref.includes(
-          compact
-        )
+        href
+          .replace(/\s+/g, '')
+          .includes(compact)
       ) {
         score =
           Math.max(
             score,
-            100 +
-              compact.length
+            100 + compact.length
           );
       }
     }
@@ -437,12 +349,8 @@ function linkScore(
 
   try {
     if (
-      new URL(
-        link.href
-      ).origin !==
-      new URL(
-        homepage
-      ).origin
+      new URL(link.href).origin !==
+      new URL(homepage).origin
     ) {
       score -=
         70;
@@ -455,17 +363,175 @@ function linkScore(
   return score;
 }
 
-/*
- * Membentuk variasi slug:
- *
- * wuthering-waves
- * wuwa
- *
- * honkai-star-rail
- * hsr
- *
- * dll.
- */
+function makeCandidateEntry(
+  url,
+  source,
+  confidence,
+  score = 0
+) {
+  return {
+    url,
+    source,
+    confidence,
+    score
+  };
+}
+
+function dedupeCandidateEntries(
+  entries
+) {
+  const rank = {
+    direct:
+      4,
+
+    discovered:
+      3,
+
+    sitemap:
+      2,
+
+    guessed:
+      1
+  };
+
+  const map =
+    new Map();
+
+  for (
+    const entry of
+    entries
+  ) {
+    if (
+      !entry?.url
+    ) {
+      continue;
+    }
+
+    const previous =
+      map.get(entry.url);
+
+    if (
+      !previous ||
+      (
+        rank[
+          entry.source
+        ] ||
+        0
+      ) >
+      (
+        rank[
+          previous.source
+        ] ||
+        0
+      ) ||
+      Number(
+        entry.score ||
+        0
+      ) >
+      Number(
+        previous.score ||
+        0
+      )
+    ) {
+      map.set(
+        entry.url,
+        entry
+      );
+    }
+  }
+
+  return [
+    ...map.values()
+  ];
+}
+
+function makeDirectCandidateEntries(
+  store,
+  game
+) {
+  return dedupeCandidateEntries(
+    [
+      store?.gameUrls?.[
+        game.id
+      ],
+
+      game?.stores?.[
+        store.id
+      ]
+    ]
+      .filter(Boolean)
+      .map(
+        (value) =>
+          absoluteUrl(
+            value,
+            store.homepage
+          )
+      )
+      .filter(Boolean)
+      .map(
+        (url) =>
+          makeCandidateEntry(
+            url,
+            'direct',
+            'high',
+            200
+          )
+      )
+  );
+}
+
+function makeDiscoveredCandidateEntries(
+  store,
+  game,
+  homepageHtml = ''
+) {
+  if (!homepageHtml) {
+    return [];
+  }
+
+  return dedupeCandidateEntries(
+    extractLinks(
+      homepageHtml,
+      store.homepage
+    )
+      .map(
+        (link) => ({
+          ...link,
+
+          score:
+            linkScore(
+              link,
+              game,
+              store.homepage
+            )
+        })
+      )
+      .filter(
+        (link) =>
+          link.score >=
+          85
+      )
+      .sort(
+        (a, b) =>
+          b.score -
+          a.score
+      )
+      .slice(
+        0,
+        4
+      )
+      .map(
+        (link) =>
+          makeCandidateEntry(
+            link.href,
+            'discovered',
+            'high',
+            link.score
+          )
+      )
+  );
+}
+
 function alternateGameSlugs(
   game
 ) {
@@ -477,42 +543,30 @@ function alternateGameSlugs(
       )
     );
 
-  const values = [
-    game?.id,
-    game?.name,
-    game?.shortName,
-
-    ...(
-      game?.aliases ||
-      []
-    )
-  ];
-
-  const slugs =
-    [];
-
   const seen =
     new Set();
 
+  const result =
+    [];
+
   for (
     const value of
-    values
+    [
+      game?.id,
+      game?.name,
+      game?.shortName,
+      ...(
+        game?.aliases ||
+        []
+      )
+    ]
   ) {
     const normalized =
-      normalizeText(
-        value
-      );
+      normalizeText(value);
 
     if (
       !normalized ||
-      unitSet.has(
-        normalized
-      )
-    ) {
-      continue;
-    }
-
-    if (
+      unitSet.has(normalized) ||
       PACKAGE_ALIAS_PATTERN.test(
         normalized
       )
@@ -520,137 +574,60 @@ function alternateGameSlugs(
       continue;
     }
 
-    const compactLength =
-      normalized
-        .replace(
-          /\s+/g,
-          ''
-        )
-        .length;
-
     if (
-      compactLength <
-      3
+      normalized
+        .replace(/\s+/g, '')
+        .length < 3
     ) {
       continue;
     }
 
     const slug =
-      slugify(
-        normalized
+      normalized.replace(
+        /\s+/g,
+        '-'
       );
 
     if (
       !slug ||
-      seen.has(
-        slug
-      )
+      seen.has(slug)
     ) {
       continue;
     }
 
-    seen.add(
-      slug
-    );
-
-    slugs.push(
-      slug
-    );
+    seen.add(slug);
+    result.push(slug);
 
     if (
-      slugs.length >=
-      5
+      result.length >=
+      4
     ) {
       break;
     }
   }
 
   if (
-    !seen.has(
-      game.id
-    )
+    game?.id &&
+    !seen.has(game.id)
   ) {
-    slugs.unshift(
+    result.unshift(
       game.id
     );
   }
 
   return [
-    ...new Set(
-      slugs
-    )
+    ...new Set(result)
   ]
     .slice(
       0,
-      5
+      4
     );
 }
 
-function makeCandidateUrls(
+function makeGuessedCandidateEntries(
   store,
-  game,
-  homepageHtml = ''
+  game
 ) {
-  const directUrls = [
-    store?.gameUrls?.[
-      game.id
-    ],
-
-    game?.stores?.[
-      store.id
-    ]
-  ]
-    .filter(
-      Boolean
-    );
-
-  /*
-   * Candidate hasil link nyata
-   * dari homepage mendapat prioritas
-   * lebih tinggi daripada tebakan.
-   */
-  const discovered =
-    homepageHtml
-      ? extractLinks(
-          homepageHtml,
-          store.homepage
-        )
-          .map(
-            (link) => ({
-              ...link,
-
-              score:
-                linkScore(
-                  link,
-                  game,
-                  store.homepage
-                )
-            })
-          )
-          .filter(
-            (link) =>
-              link.score >=
-              85
-          )
-          .sort(
-            (
-              a,
-              b
-            ) =>
-              b.score -
-              a.score
-          )
-          .slice(
-            0,
-            5
-          )
-          .map(
-            (link) =>
-              link.href
-          )
-
-      : [];
-
   const home =
     String(
       store.homepage ||
@@ -675,9 +652,7 @@ function makeCandidateUrls(
 
   for (
     const slug of
-    alternateGameSlugs(
-      game
-    )
+    alternateGameSlugs(game)
   ) {
     for (
       const template of
@@ -685,9 +660,7 @@ function makeCandidateUrls(
     ) {
       const url =
         absoluteUrl(
-          String(
-            template
-          )
+          String(template)
             .replaceAll(
               '{homepage}',
               home
@@ -702,33 +675,64 @@ function makeCandidateUrls(
 
       if (url) {
         generated.push(
-          url
+          makeCandidateEntry(
+            url,
+            'guessed',
+            'low',
+            10
+          )
         );
       }
     }
   }
 
-  return [
-    ...new Set([
-      ...directUrls
-        .map(
-          (url) =>
-            absoluteUrl(
-              url,
-              store.homepage
-            )
-        )
-        .filter(
-          Boolean
-        ),
+  return dedupeCandidateEntries(
+    generated
+  );
+}
 
-      ...discovered,
-      ...generated
-    ])
-  ]
-    .slice(
-      0,
-      24
+function makeCandidateEntries(
+  store,
+  game,
+  homepageHtml = ''
+) {
+  return dedupeCandidateEntries([
+    ...makeDirectCandidateEntries(
+      store,
+      game
+    ),
+
+    ...makeDiscoveredCandidateEntries(
+      store,
+      game,
+      homepageHtml
+    ),
+
+    ...makeGuessedCandidateEntries(
+      store,
+      game
+    )
+  ]);
+}
+
+/*
+ * Backward compatibility untuk
+ * module/test lama yang masih
+ * mengharapkan array URL string.
+ */
+function makeCandidateUrls(
+  store,
+  game,
+  homepageHtml = ''
+) {
+  return makeCandidateEntries(
+    store,
+    game,
+    homepageHtml
+  )
+    .map(
+      (entry) =>
+        entry.url
     );
 }
 
@@ -747,54 +751,26 @@ function extractSitemapLocations(
     String(
       xml ||
       ''
-    ).matchAll(
-      regex
-    )
+    ).matchAll(regex)
   ) {
-    const raw =
-      decodeEntities(
-        stripTags(
-          match[1]
-        )
-      );
-
     const url =
       absoluteUrl(
-        raw,
+        decodeEntities(
+          stripTags(
+            match[1]
+          )
+        ),
         baseUrl
       );
 
     if (url) {
-      locations.push(
-        url
-      );
+      locations.push(url);
     }
   }
 
   return [
-    ...new Set(
-      locations
-    )
+    ...new Set(locations)
   ];
-}
-
-function scoreUrlForGame(
-  url,
-  game,
-  homepage
-) {
-  return linkScore(
-    {
-      href:
-        url,
-
-      text:
-        ''
-    },
-
-    game,
-    homepage
-  );
 }
 
 function sitemapRoots(
@@ -802,9 +778,7 @@ function sitemapRoots(
 ) {
   try {
     const home =
-      new URL(
-        homepage
-      );
+      new URL(homepage);
 
     return [
       new URL(
@@ -822,21 +796,14 @@ function sitemapRoots(
   }
 }
 
-/*
- * Sitemap hanya dipakai sebagai
- * fallback setelah candidate awal gagal.
- *
- * Jadi tidak setiap toko otomatis
- * menambah request sitemap.
- */
-async function discoverSitemapUrls(
+async function discoverSitemapCandidates(
   store,
   game,
   {
     fetchText,
-    timeoutMs = 3000,
+    timeoutMs = 2800,
     maxSitemaps = 2,
-    maxUrls = 6
+    maxUrls = 4
   } = {}
 ) {
   if (
@@ -845,6 +812,9 @@ async function discoverSitemapUrls(
     !store?.homepage
   ) {
     return {
+      entries:
+        [],
+
       urls:
         [],
 
@@ -882,8 +852,7 @@ async function discoverSitemapUrls(
 
   while (
     queue.length &&
-    checked <
-    maxSitemaps
+    checked < maxSitemaps
   ) {
     const current =
       queue.shift();
@@ -905,41 +874,41 @@ async function discoverSitemapUrls(
       1;
 
     try {
-      /*
-       * Sitemap discovery tidak
-       * melakukan retry tersendiri
-       * agar tidak menghasilkan
-       * terlalu banyak request.
-       */
       const response =
         await fetchText(
           current.url,
           {
             timeoutMs,
             retries:
-              0
+              0,
+
+            headers: {
+              accept:
+                'application/xml,text/xml;q=0.9,text/plain;q=0.8,*/*;q=0.5'
+            }
           }
         );
 
       const locations =
         extractSitemapLocations(
           response.text,
-
           response.finalUrl ||
           current.url
         );
 
-      /*
-       * Langsung cari URL game
-       * pada sitemap.
-       */
       for (
         const location of
         locations
       ) {
         const score =
-          scoreUrlForGame(
-            location,
+          linkScore(
+            {
+              href:
+                location,
+
+              text:
+                ''
+            },
             game,
             store.homepage
           );
@@ -948,28 +917,21 @@ async function discoverSitemapUrls(
           score >=
           85
         ) {
-          const previous =
-            found.get(
-              location
-            ) ||
-            0;
-
           found.set(
             location,
+
             Math.max(
-              previous,
+              found.get(
+                location
+              ) ||
+              0,
+
               score
             )
           );
         }
       }
 
-      /*
-       * Jika sitemap.xml merupakan
-       * sitemap index, cek child
-       * sitemap yang paling mungkin
-       * berisi halaman game/product.
-       */
       if (
         current.depth ===
         0
@@ -983,42 +945,27 @@ async function discoverSitemapUrls(
                 )
             )
             .sort(
-              (
-                a,
-                b
-              ) => {
-                const preference =
-                  (value) =>
-                    /product|game|page|post/i.test(
-                      value
-                    )
-                      ? 1
-                      : 0;
-
-                return (
-                  preference(
+              (a, b) =>
+                Number(
+                  /product|game|page/i.test(
                     b
-                  ) -
-                  preference(
+                  )
+                ) -
+                Number(
+                  /product|game|page/i.test(
                     a
                   )
-                );
-              }
+                )
             )
             .slice(
               0,
-
               Math.max(
                 0,
                 maxSitemaps -
-                  checked
+                checked
               )
             );
 
-        /*
-         * Child sitemap diprioritaskan
-         * sebelum sitemap root kedua.
-         */
         for (
           const url of
           nested.reverse()
@@ -1036,16 +983,7 @@ async function discoverSitemapUrls(
           }
         }
       }
-    } catch (
-      error
-    ) {
-      /*
-       * Error sitemap tidak dianggap
-       * sebagai error utama toko.
-       *
-       * Sitemap hanyalah discovery
-       * tambahan.
-       */
+    } catch (error) {
       errors.push({
         url:
           current.url,
@@ -1061,15 +999,12 @@ async function discoverSitemapUrls(
     }
   }
 
-  const urls =
+  const entries =
     [
       ...found.entries()
     ]
       .sort(
-        (
-          a,
-          b
-        ) =>
+        (a, b) =>
           b[1] -
           a[1]
       )
@@ -1078,14 +1013,54 @@ async function discoverSitemapUrls(
         maxUrls
       )
       .map(
-        ([url]) =>
-          url
+        ([url, score]) =>
+          makeCandidateEntry(
+            url,
+            'sitemap',
+            'high',
+            score
+          )
       );
 
   return {
-    urls,
+    entries,
+
+    urls:
+      entries.map(
+        (entry) =>
+          entry.url
+      ),
+
     checked,
     errors
+  };
+}
+
+/*
+ * Alias kompatibel dengan patch
+ * sebelumnya.
+ */
+async function discoverSitemapUrls(
+  store,
+  game,
+  options = {}
+) {
+  const result =
+    await discoverSitemapCandidates(
+      store,
+      game,
+      options
+    );
+
+  return {
+    urls:
+      result.urls,
+
+    checked:
+      result.checked,
+
+    errors:
+      result.errors
   };
 }
 
@@ -1097,7 +1072,12 @@ module.exports = {
   isStrongIdentity,
   containsPhrase,
   linkScore,
+  makeCandidateEntries,
   makeCandidateUrls,
+  makeDirectCandidateEntries,
+  makeDiscoveredCandidateEntries,
+  makeGuessedCandidateEntries,
   extractSitemapLocations,
+  discoverSitemapCandidates,
   discoverSitemapUrls
 };
