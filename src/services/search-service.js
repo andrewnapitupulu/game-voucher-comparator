@@ -54,11 +54,13 @@ function envBoolean(
     return fallback;
   }
 
-  return String(
-    value
-  )
-    .toLowerCase() ===
-    'true';
+  return (
+    String(
+      value
+    )
+      .toLowerCase() ===
+    'true'
+  );
 }
 
 function boundedNumber(
@@ -246,55 +248,70 @@ async function allSettledWithConcurrency(
   return results;
 }
 
+function resolveHttpStatus(
+  error,
+  message
+) {
+  const direct =
+    Number(
+      error?.status
+    );
+
+  if (
+    Number.isFinite(
+      direct
+    ) &&
+    direct >
+      0
+  ) {
+    return direct;
+  }
+
+  const match =
+    String(
+      message ||
+      ''
+    )
+      .match(
+        /HTTP\s+(\d{3})/i
+      );
+
+  return match
+    ? Number(
+        match[
+          1
+        ]
+      )
+    : null;
+}
+
 function classifyProviderFailure(
   error
 ) {
   const message =
     String(
-      error
-        ?.message ||
+      error?.message ||
       'Gagal mengambil harga'
     );
 
   const code =
     String(
-      error
-        ?.code ||
+      error?.code ||
       ''
     )
       .toUpperCase();
 
-  const statusMatch =
-    message.match(
-      /HTTP\s+(\d{3})/i
-    );
-
   const httpStatus =
-    Number.isFinite(
-      Number(
-        error
-          ?.status
-      )
-    )
-      ? Number(
-          error.status
-        )
-      : (
-          statusMatch
-            ? Number(
-                statusMatch[
-                  1
-                ]
-              )
-            : null
-        );
+    resolveHttpStatus(
+      error,
+      message
+    );
 
   /*
    * ======================================================
    * ACCESS BLOCKED
    * ======================================================
    */
-
   if (
     code ===
       'ACCESS_BLOCKED' ||
@@ -311,6 +328,10 @@ function classifyProviderFailure(
     return {
       statusCode:
         'ACCESS_BLOCKED',
+
+      detailCode:
+        code ||
+        `HTTP_${httpStatus}`,
 
       httpStatus,
 
@@ -331,7 +352,6 @@ function classifyProviderFailure(
    * RATE LIMITED
    * ======================================================
    */
-
   if (
     code ===
       'RATE_LIMITED' ||
@@ -343,6 +363,9 @@ function classifyProviderFailure(
   ) {
     return {
       statusCode:
+        'RATE_LIMITED',
+
+      detailCode:
         'RATE_LIMITED',
 
       httpStatus:
@@ -359,10 +382,125 @@ function classifyProviderFailure(
 
   /*
    * ======================================================
-   * TIMEOUT
+   * DNS ERROR
    * ======================================================
    */
+  if (
+    code ===
+      'NETWORK_DNS_ERROR' ||
+    /getaddrinfo|\bdns\b|enotfound|eai_again/i.test(
+      message
+    )
+  ) {
+    return {
+      statusCode:
+        'NETWORK_ERROR',
 
+      detailCode:
+        'NETWORK_DNS_ERROR',
+
+      httpStatus,
+
+      retryable:
+        true,
+
+      message:
+        'NETWORK ERROR · DNS/domain toko tidak dapat di-resolve dari server aplikasi'
+    };
+  }
+
+  /*
+   * ======================================================
+   * TLS ERROR
+   * ======================================================
+   */
+  if (
+    code ===
+      'NETWORK_TLS_ERROR' ||
+    /certificate|\btls\b|\bssl\b/i.test(
+      message
+    )
+  ) {
+    return {
+      statusCode:
+        'NETWORK_ERROR',
+
+      detailCode:
+        'NETWORK_TLS_ERROR',
+
+      httpStatus,
+
+      retryable:
+        false,
+
+      message:
+        'NETWORK ERROR · Koneksi TLS/sertifikat gagal dari server aplikasi'
+    };
+  }
+
+  /*
+   * ======================================================
+   * CONNECTION RESET / REFUSED
+   * ======================================================
+   */
+  if (
+    code ===
+      'NETWORK_CONNECTION_ERROR' ||
+    /econnreset|econnrefused|connection reset|socket/i.test(
+      message
+    )
+  ) {
+    return {
+      statusCode:
+        'NETWORK_ERROR',
+
+      detailCode:
+        'NETWORK_CONNECTION_ERROR',
+
+      httpStatus,
+
+      retryable:
+        true,
+
+      message:
+        'NETWORK ERROR · Koneksi ke server toko terputus atau ditolak saat request server-side'
+    };
+  }
+
+  /*
+   * ======================================================
+   * CONNECTION TIMEOUT
+   * ======================================================
+   */
+  if (
+    code ===
+      'NETWORK_CONNECT_TIMEOUT' ||
+    /connect timeout|etimedout|und_err_connect_timeout/i.test(
+      message
+    )
+  ) {
+    return {
+      statusCode:
+        'NETWORK_ERROR',
+
+      detailCode:
+        'NETWORK_CONNECT_TIMEOUT',
+
+      httpStatus,
+
+      retryable:
+        true,
+
+      message:
+        'NETWORK ERROR · Koneksi ke server toko melewati batas waktu'
+    };
+  }
+
+  /*
+   * ======================================================
+   * REQUEST TIMEOUT
+   * ======================================================
+   */
   if (
     code ===
       'TIMEOUT' ||
@@ -372,6 +510,9 @@ function classifyProviderFailure(
   ) {
     return {
       statusCode:
+        'TIMEOUT',
+
+      detailCode:
         'TIMEOUT',
 
       httpStatus,
@@ -386,10 +527,9 @@ function classifyProviderFailure(
 
   /*
    * ======================================================
-   * PAGE NOT VERIFIED
+   * GAME PAGE NOT VERIFIED
    * ======================================================
    */
-
   if (
     code ===
       'PAGE_NOT_VERIFIED' ||
@@ -399,6 +539,9 @@ function classifyProviderFailure(
   ) {
     return {
       statusCode:
+        'PAGE_NOT_VERIFIED',
+
+      detailCode:
         'PAGE_NOT_VERIFIED',
 
       httpStatus,
@@ -416,7 +559,6 @@ function classifyProviderFailure(
    * PARSER FAILED
    * ======================================================
    */
-
   if (
     code ===
       'PARSER_FAILED' ||
@@ -426,8 +568,7 @@ function classifyProviderFailure(
   ) {
     const detailCode =
       String(
-        error
-          ?.parserReason ||
+        error?.parserReason ||
         'UNSUPPORTED_STRUCTURE'
       )
         .toUpperCase();
@@ -462,19 +603,10 @@ function classifyProviderFailure(
       statusCode:
         'PARSER_FAILED',
 
-      /*
-       * Detail internal yang sangat
-       * berguna untuk debugging.
-       */
       detailCode,
 
       httpStatus,
 
-      /*
-       * JS_RENDERED_CONTENT berpotensi
-       * berubah jika suatu saat kita
-       * punya adapter/API khusus.
-       */
       retryable:
         detailCode ===
         'JS_RENDERED_CONTENT',
@@ -495,7 +627,6 @@ function classifyProviderFailure(
    * NOT CONFIGURED
    * ======================================================
    */
-
   if (
     code ===
       'NOT_CONFIGURED' ||
@@ -505,6 +636,9 @@ function classifyProviderFailure(
   ) {
     return {
       statusCode:
+        'NOT_CONFIGURED',
+
+      detailCode:
         'NOT_CONFIGURED',
 
       httpStatus,
@@ -521,8 +655,15 @@ function classifyProviderFailure(
    * ======================================================
    * PAGE NOT FOUND
    * ======================================================
+   *
+   * Wording sengaja diubah.
+   *
+   * Ini tidak berarti website toko
+   * tidak memiliki produk.
+   *
+   * Hanya candidate URL yang dicoba
+   * oleh sistem menghasilkan 404/410.
    */
-
   if (
     code ===
       'PAGE_NOT_FOUND' ||
@@ -535,16 +676,19 @@ function classifyProviderFailure(
       statusCode:
         'PAGE_NOT_FOUND',
 
+      detailCode:
+        'PAGE_NOT_FOUND',
+
       httpStatus,
 
       retryable:
         false,
 
       message:
-        `PAGE NOT FOUND · HTTP ${
+        `PAGE NOT FOUND · Candidate URL yang dicoba mengembalikan HTTP ${
           httpStatus ||
           404
-        } pada candidate URL`
+        }`
     };
   }
 
@@ -553,7 +697,6 @@ function classifyProviderFailure(
    * UPSTREAM ERROR
    * ======================================================
    */
-
   if (
     code ===
       'UPSTREAM_ERROR' ||
@@ -566,6 +709,10 @@ function classifyProviderFailure(
   ) {
     return {
       statusCode:
+        'UPSTREAM_ERROR',
+
+      detailCode:
+        code ||
         'UPSTREAM_ERROR',
 
       httpStatus,
@@ -584,14 +731,13 @@ function classifyProviderFailure(
 
   /*
    * ======================================================
-   * NETWORK ERROR
+   * GENERIC FETCH ERROR
    * ======================================================
    */
-
   if (
     code ===
-      'NETWORK_ERROR' ||
-    /fetch failed|network|econn|enotfound|getaddrinfo|socket/i.test(
+      'NETWORK_FETCH_FAILED' ||
+    /fetch failed|network/i.test(
       message
     )
   ) {
@@ -599,18 +745,25 @@ function classifyProviderFailure(
       statusCode:
         'NETWORK_ERROR',
 
+      detailCode:
+        'NETWORK_FETCH_FAILED',
+
       httpStatus,
 
       retryable:
         true,
 
       message:
-        'NETWORK ERROR · Server aplikasi gagal menjangkau toko'
+        'NETWORK ERROR · Request server-side ke toko gagal setelah retry'
     };
   }
 
   return {
     statusCode:
+      'UNKNOWN_ERROR',
+
+    detailCode:
+      code ||
       'UNKNOWN_ERROR',
 
     httpStatus,
@@ -675,6 +828,10 @@ async function searchPrices(
       10000
     );
 
+  /*
+   * Maksimum toko yang diproses
+   * bersamaan pada satu API request.
+   */
   const storeConcurrency =
     boundedNumber(
       process.env
@@ -757,10 +914,13 @@ async function searchPrices(
       storeIds
     });
 
+  /*
+   * Adapter toko tidak ditembak
+   * semuanya secara bersamaan.
+   */
   const results =
     await allSettledWithConcurrency(
       adapters,
-
       storeConcurrency,
 
       async (
@@ -836,6 +996,9 @@ async function searchPrices(
               'live',
 
             statusCode:
+              'LIVE',
+
+            detailCode:
               'LIVE',
 
             httpStatus:
@@ -1043,7 +1206,7 @@ async function searchPrices(
     groups,
 
     notice:
-      'Harga diambil real-time per batch tanpa database dan cache. Parser mencoba HTML, embedded JSON, JSON-LD, Next.js/Nuxt state, lalu memberikan diagnostic reason jika produk masih belum dapat diekstrak.'
+      'Harga diambil real-time per batch tanpa database dan cache. URL game dicari dari direct URL, homepage, candidate slug, dan sitemap; error jaringan transient dicoba ulang satu kali.'
   };
 }
 
