@@ -20,18 +20,56 @@ const duniagames =
     './duniagames'
   );
 
+function optionalAdapter(
+  path
+) {
+  try {
+    return require(
+      path
+    );
+  } catch (
+    error
+  ) {
+    /*
+     * Adapter dari patch sebelumnya dibuat optional.
+     *
+     * Jadi kalau branch tertentu belum punya satu file
+     * dedicated lama, server tidak langsung crash.
+     */
+    if (
+      error?.code ===
+        'MODULE_NOT_FOUND' &&
+      String(
+        error.message ||
+        ''
+      ).includes(
+        `'${path}'`
+      )
+    ) {
+      return null;
+    }
+
+    throw error;
+  }
+}
+
+/*
+ * ============================================================
+ * ADAPTERS DARI PATCH SEBELUMNYA
+ * ============================================================
+ */
 const gigames =
-  require(
+  optionalAdapter(
     './gigames'
   );
 
 const ouraStore =
-  require(
+  optionalAdapter(
     './oura-store'
   );
 
 const seagm =
-  require(
+  optionalAdapter(
     './seagm'
   );
 
@@ -41,8 +79,28 @@ const kiosGameIndonesia =
   );
 
 const topupdeh =
-  require(
+  optionalAdapter(
     './topupdeh'
+  );
+
+/*
+ * ============================================================
+ * STRICT ADAPTERS
+ * ============================================================
+ */
+const casatopup =
+  require(
+    './casatopup'
+  );
+
+const topupgamez =
+  require(
+    './topupgamez'
+  );
+
+const bxystore =
+  require(
+    './bxystore'
   );
 
 const {
@@ -77,20 +135,43 @@ const {
 );
 
 const ADAPTER_REGISTRY_VERSION =
-  '2026-08-13-dedicated-v4';
+  '2026-08-13-strict-v1';
+
+/*
+ * ============================================================
+ * STRICT-ONLY STORE
+ * ============================================================
+ *
+ * Store ini TIDAK BOLEH fallback ke universal parser.
+ *
+ * Alasannya:
+ *
+ * kalau strict parser gagal, lebih baik tampil:
+ *
+ * PARSER_FAILED
+ *
+ * daripada menampilkan harga salah seperti:
+ *
+ * Top Up Zenless Zone Zero Murah → Rp199
+ *
+ * atau:
+ *
+ * 300 Monochrome → Rp16.224
+ */
+const STRICT_ONLY_STORE_IDS =
+  new Set([
+    'casatopup',
+    'topupgamez',
+    'bxystore',
+    'kios-game-indonesia'
+  ]);
 
 const DEDICATED = {
   codashop,
-
   unipin,
-
   lapakgaming,
-
   duniagames,
 
-  /*
-   * Custom dedicated adapters.
-   */
   gigames,
 
   'oura-store':
@@ -101,7 +182,13 @@ const DEDICATED = {
   'kios-game-indonesia':
     kiosGameIndonesia,
 
-  topupdeh
+  topupdeh,
+
+  casatopup,
+
+  topupgamez,
+
+  bxystore
 };
 
 function normalizeStrategyList(
@@ -126,8 +213,7 @@ function normalizeStrategyList(
     .map(
       (value) =>
         String(
-          value ||
-          ''
+          value || ''
         )
           .trim()
           .toLowerCase()
@@ -164,7 +250,9 @@ function buildStoreAdapter(
     {};
 
   /*
+   * ========================================================
    * PUBLIC API
+   * ========================================================
    */
   if (
     isPublicApiConfigured(
@@ -180,7 +268,9 @@ function buildStoreAdapter(
   }
 
   /*
+   * ========================================================
    * DEDICATED
+   * ========================================================
    */
   if (
     DEDICATED[
@@ -194,11 +284,23 @@ function buildStoreAdapter(
   }
 
   /*
-   * UNIVERSAL FALLBACK
+   * ========================================================
+   * UNIVERSAL
+   * ========================================================
+   *
+   * STRICT_ONLY_STORE_IDS sengaja TIDAK mendapat
+   * universal fallback.
+   *
+   * Tujuannya supaya false-positive tidak kembali
+   * masuk setelah dedicated strict parser menolaknya.
    */
   if (
     store.disableUniversal !==
-    true
+      true &&
+    !STRICT_ONLY_STORE_IDS
+      .has(
+        store.id
+      )
   ) {
     available.universal =
       createUniversalAdapter(
@@ -223,12 +325,17 @@ function buildStoreAdapter(
       );
 
   /*
-   * Compatibility guard.
+   * Compatibility fallback hanya untuk
+   * non-strict stores.
    */
   if (
     !strategies.length &&
     store.disableUniversal !==
-    true
+      true &&
+    !STRICT_ONLY_STORE_IDS
+      .has(
+        store.id
+      )
   ) {
     strategies.push({
       id:
