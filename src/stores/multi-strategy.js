@@ -3,19 +3,13 @@
 const {
   shouldAttemptParserRecovery,
   tryParserRecovery
-} = require('./parser-recovery');
+} = require(
+  './parser-recovery'
+);
 
 const MULTI_STRATEGY_VERSION =
-  '2026-08-13-multi-v4';
+  '2026-08-13-multi-v5';
 
-/*
- * ============================================================
- * TERMINAL PROVIDER STATES
- * ============================================================
- *
- * Jika state-aware adapter sudah bisa membuktikan keadaan
- * berikut, JANGAN lanjut ke universal parser.
- */
 const TERMINAL_PROVIDER_STATE_CODES =
   new Set([
     'REGION_UNAVAILABLE',
@@ -24,13 +18,6 @@ const TERMINAL_PROVIDER_STATE_CODES =
     'MAINTENANCE'
   ]);
 
-/*
- * ============================================================
- * ERROR PRIORITY
- * ============================================================
- *
- * Provider state HARUS lebih kuat daripada PARSER_FAILED.
- */
 const ERROR_PRIORITY = {
   REGION_UNAVAILABLE:
     150,
@@ -97,7 +84,8 @@ function normalizeCode(
   error
 ) {
   return String(
-    error?.code || ''
+    error?.code ||
+    ''
   )
     .trim()
     .toUpperCase();
@@ -131,11 +119,15 @@ function pickStrongerError(
   current,
   candidate
 ) {
-  if (!candidate) {
+  if (
+    !candidate
+  ) {
     return current;
   }
 
-  if (!current) {
+  if (
+    !current
+  ) {
     return candidate;
   }
 
@@ -161,21 +153,15 @@ function shouldStopChain(
       error
     );
 
-  /*
-   * ========================================================
-   * PROVIDER STATE = TERMINAL
-   * ========================================================
-   */
   if (
     TERMINAL_PROVIDER_STATE_CODES
-      .has(code)
+      .has(
+        code
+      )
   ) {
     return true;
   }
 
-  /*
-   * Rate limit.
-   */
   if (
     code ===
     'RATE_LIMITED'
@@ -183,9 +169,6 @@ function shouldStopChain(
     return true;
   }
 
-  /*
-   * Error selain ACCESS_BLOCKED masih boleh lanjut.
-   */
   if (
     code !==
     'ACCESS_BLOCKED'
@@ -294,7 +277,8 @@ function createMultiStrategyAdapter(
       game,
       options = {}
     ) {
-      const attempts = [];
+      const attempts =
+        [];
 
       let strongestError =
         null;
@@ -374,9 +358,9 @@ function createMultiStrategyAdapter(
                   error?.message ||
                   null,
 
-                providerStateDiagnostics:
+                productStateDiagnostics:
                   error
-                    ?.providerStateDiagnostics ||
+                    ?.productStateDiagnostics ||
                   null
               }
             )
@@ -389,19 +373,8 @@ function createMultiStrategyAdapter(
             );
 
           /*
-           * ==================================================
-           * TERMINAL PROVIDER STATE
-           * ==================================================
-           *
-           * INI YANG MENCEGAH:
-           *
-           * REGION_UNAVAILABLE
-           *        ↓
-           * universal parser
-           *        ↓
-           * PARSER_FAILED
-           *
-           * State yang sudah terbukti harus dipertahankan.
+           * Jangan lanjut ke universal kalau dedicated
+           * sudah membuktikan provider state.
            */
           if (
             isTerminalProviderState(
@@ -411,11 +384,6 @@ function createMultiStrategyAdapter(
             break;
           }
 
-          /*
-           * ==================================================
-           * PARSER RECOVERY
-           * ==================================================
-           */
           if (
             strategy.id ===
               'universal' &&
@@ -498,16 +466,6 @@ function createMultiStrategyAdapter(
                     message:
                       recoveryError
                         ?.message ||
-                      null,
-
-                    recoveryDiagnostics:
-                      recoveryError
-                        ?.parserRecoveryDiagnostics ||
-                      null,
-
-                    providerStateDiagnostics:
-                      recoveryError
-                        ?.providerStateDiagnostics ||
                       null
                   }
                 )
@@ -564,8 +522,7 @@ function createMultiStrategyAdapter(
           'UNKNOWN_ERROR';
       }
 
-      finalError
-        .accessDiagnostics =
+      finalError.accessDiagnostics =
         lastDiagnostics;
 
       throw finalError;
