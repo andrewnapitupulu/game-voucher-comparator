@@ -1,15 +1,9 @@
 'use strict';
 
 const {
-  fetchDedicatedOffers
+  fetchStrictStoreOffers
 } = require(
-  './dedicated-store-parser'
-);
-
-const {
-  fetchDynamicOffers
-} = require(
-  './dynamic-page-recovery'
+  './strict-store-parser'
 );
 
 const STORE = {
@@ -20,29 +14,7 @@ const STORE = {
     'Kios Game Indonesia'
 };
 
-function toLive(
-  offers
-) {
-  return offers.map(
-    (offer) => ({
-      ...offer,
-
-      extractionSource:
-        offer.extractionSource ||
-        offer.source ||
-        'dedicated',
-
-      source:
-        'live',
-
-      accessStrategy:
-        offer.accessStrategy ||
-        'dedicated'
-    })
-  );
-}
-
-function pageUrlsFor(
+function urlsFor(
   game
 ) {
   const slug =
@@ -50,24 +22,32 @@ function pageUrlsFor(
       game.id
     );
 
-  const urls = [
-    `https://kiosgameindonesia.com/${slug}`,
-
+  const candidates = [
     `https://kiosgameindonesia.com/en/${slug}`,
-
+    `https://kiosgameindonesia.com/${slug}`,
     `https://kiosgameindonesia.com/id/${slug}`
   ];
 
+  /*
+   * Route alternatif Mobile Legends.
+   */
   if (
     game.id ===
     'mobile-legends'
   ) {
-    urls.push(
+    candidates.push(
       'https://kiosgameindonesia.com/en/mobile-legends-ph'
     );
   }
 
-  return urls;
+  return {
+    candidates,
+
+    discoveryPages: [
+      'https://kiosgameindonesia.com/en',
+      'https://kiosgameindonesia.com/'
+    ]
+  };
 }
 
 module.exports = {
@@ -81,84 +61,26 @@ module.exports = {
     game,
     options = {}
   ) {
-    const pageUrls =
-      pageUrlsFor(
+    const urls =
+      urlsFor(
         game
       );
 
-    try {
-      const offers =
-        await fetchDedicatedOffers({
-          storeId:
-            STORE.id,
+    return fetchStrictStoreOffers({
+      store:
+        STORE,
 
-          storeName:
-            STORE.name,
+      game,
+      options,
 
-          game,
-          options,
+      candidates:
+        urls.candidates,
 
-          candidates:
-            pageUrls.map(
-              (url) => ({
-                url,
+      discoveryPages:
+        urls.discoveryPages,
 
-                mode:
-                  'page'
-              })
-            ),
-
-          /*
-           * WAJIB true.
-           *
-           * Product list Kios dimuat setelah page load.
-           */
-          enableDynamicDiscovery:
-            true,
-
-          minOffers:
-            1
-        });
-
-      if (
-        offers.length
-      ) {
-        return toLive(
-          offers
-        );
-      }
-    } catch (
-      firstError
-    ) {
-      try {
-        return await fetchDynamicOffers({
-          store:
-            STORE,
-
-          game,
-          options,
-
-          pageUrls
-        });
-      } catch (
-        dynamicError
-      ) {
-        dynamicError
-          .previousDedicatedError = {
-            code:
-              firstError?.code ||
-              null,
-
-            parserReason:
-              firstError
-                ?.parserReason ||
-              null
-          };
-
-        throw dynamicError;
-      }
-    }
-
-    return [];
+      dynamic:
+        true
+    });
   }
 };
