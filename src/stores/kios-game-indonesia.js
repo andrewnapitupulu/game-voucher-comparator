@@ -6,7 +6,43 @@ const {
   './dedicated-store-parser'
 );
 
-function candidatesFor(
+const {
+  fetchDynamicOffers
+} = require(
+  './dynamic-page-recovery'
+);
+
+const STORE = {
+  id:
+    'kios-game-indonesia',
+
+  name:
+    'Kios Game Indonesia'
+};
+
+function toLive(
+  offers
+) {
+  return offers.map(
+    (offer) => ({
+      ...offer,
+
+      extractionSource:
+        offer.extractionSource ||
+        offer.source ||
+        'dedicated',
+
+      source:
+        'live',
+
+      accessStrategy:
+        offer.accessStrategy ||
+        'dedicated'
+    })
+  );
+}
+
+function pageUrlsFor(
   game
 ) {
   const slug =
@@ -14,82 +50,115 @@ function candidatesFor(
       game.id
     );
 
-  const candidates = [
-    {
-      url:
-        `https://kiosgameindonesia.com/${slug}`,
+  const urls = [
+    `https://kiosgameindonesia.com/${slug}`,
 
-      mode:
-        'page'
-    },
+    `https://kiosgameindonesia.com/en/${slug}`,
 
-    {
-      url:
-        `https://kiosgameindonesia.com/en/${slug}`,
-
-      mode:
-        'page'
-    },
-
-    {
-      url:
-        `https://kiosgameindonesia.com/id/${slug}`,
-
-      mode:
-        'page'
-    }
+    `https://kiosgameindonesia.com/id/${slug}`
   ];
 
   if (
     game.id ===
     'mobile-legends'
   ) {
-    candidates.push({
-      url:
-        'https://kiosgameindonesia.com/en/mobile-legends-ph',
-
-      mode:
-        'page'
-    });
+    urls.push(
+      'https://kiosgameindonesia.com/en/mobile-legends-ph'
+    );
   }
 
-  return candidates;
+  return urls;
 }
 
 module.exports = {
   id:
-    'kios-game-indonesia',
+    STORE.id,
 
   name:
-    'Kios Game Indonesia',
+    STORE.name,
 
   async fetchOffers(
     game,
     options = {}
   ) {
-    return fetchDedicatedOffers({
-      storeId:
-        'kios-game-indonesia',
+    const pageUrls =
+      pageUrlsFor(
+        game
+      );
 
-      storeName:
-        'Kios Game Indonesia',
+    try {
+      const offers =
+        await fetchDedicatedOffers({
+          storeId:
+            STORE.id,
 
-      game,
-      options,
+          storeName:
+            STORE.name,
 
-      candidates:
-        candidatesFor(
-          game
-        ),
+          game,
+          options,
 
-      enableDynamicDiscovery:
-        false,
+          candidates:
+            pageUrls.map(
+              (url) => ({
+                url,
 
-      minOffers:
-        game.id ===
-        'mobile-legends'
-          ? 2
-          : 1
-    });
+                mode:
+                  'page'
+              })
+            ),
+
+          /*
+           * WAJIB true.
+           *
+           * Product list Kios dimuat setelah page load.
+           */
+          enableDynamicDiscovery:
+            true,
+
+          minOffers:
+            1
+        });
+
+      if (
+        offers.length
+      ) {
+        return toLive(
+          offers
+        );
+      }
+    } catch (
+      firstError
+    ) {
+      try {
+        return await fetchDynamicOffers({
+          store:
+            STORE,
+
+          game,
+          options,
+
+          pageUrls
+        });
+      } catch (
+        dynamicError
+      ) {
+        dynamicError
+          .previousDedicatedError = {
+            code:
+              firstError?.code ||
+              null,
+
+            parserReason:
+              firstError
+                ?.parserReason ||
+              null
+          };
+
+        throw dynamicError;
+      }
+    }
+
+    return [];
   }
 };
