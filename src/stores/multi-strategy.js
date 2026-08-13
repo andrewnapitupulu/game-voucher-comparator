@@ -8,8 +8,16 @@ const {
 );
 
 const MULTI_STRATEGY_VERSION =
-  '2026-08-13-multi-v5';
+  '2026-08-13-terminal-state-v1';
 
+/*
+ * ============================================================
+ * TERMINAL PROVIDER STATES
+ * ============================================================
+ *
+ * Jika dedicated adapter sudah berhasil membuktikan kondisi
+ * ini, universal parser TIDAK BOLEH dijalankan lagi.
+ */
 const TERMINAL_PROVIDER_STATE_CODES =
   new Set([
     'REGION_UNAVAILABLE',
@@ -18,6 +26,9 @@ const TERMINAL_PROVIDER_STATE_CODES =
     'MAINTENANCE'
   ]);
 
+/*
+ * Provider state harus lebih kuat daripada PARSER_FAILED.
+ */
 const ERROR_PRIORITY = {
   REGION_UNAVAILABLE:
     150,
@@ -153,6 +164,9 @@ function shouldStopChain(
       error
     );
 
+  /*
+   * PROVIDER STATE
+   */
   if (
     TERMINAL_PROVIDER_STATE_CODES
       .has(
@@ -162,6 +176,9 @@ function shouldStopChain(
     return true;
   }
 
+  /*
+   * RATE LIMITED
+   */
   if (
     code ===
     'RATE_LIMITED'
@@ -169,6 +186,10 @@ function shouldStopChain(
     return true;
   }
 
+  /*
+   * Error selain ACCESS_BLOCKED
+   * masih boleh melanjutkan chain.
+   */
   if (
     code !==
     'ACCESS_BLOCKED'
@@ -361,6 +382,11 @@ function createMultiStrategyAdapter(
                 productStateDiagnostics:
                   error
                     ?.productStateDiagnostics ||
+                  null,
+
+                providerStateDiagnostics:
+                  error
+                    ?.providerStateDiagnostics ||
                   null
               }
             )
@@ -373,8 +399,12 @@ function createMultiStrategyAdapter(
             );
 
           /*
-           * Jangan lanjut ke universal kalau dedicated
-           * sudah membuktikan provider state.
+           * ==================================================
+           * TERMINAL PROVIDER STATE
+           * ==================================================
+           *
+           * Jangan biarkan universal parser menimpa
+           * state yang sudah terbukti.
            */
           if (
             isTerminalProviderState(
@@ -384,6 +414,11 @@ function createMultiStrategyAdapter(
             break;
           }
 
+          /*
+           * ==================================================
+           * PARSER RECOVERY
+           * ==================================================
+           */
           if (
             strategy.id ===
               'universal' &&
@@ -466,6 +501,11 @@ function createMultiStrategyAdapter(
                     message:
                       recoveryError
                         ?.message ||
+                      null,
+
+                    recoveryDiagnostics:
+                      recoveryError
+                        ?.parserRecoveryDiagnostics ||
                       null
                   }
                 )
@@ -532,16 +572,11 @@ function createMultiStrategyAdapter(
 
 module.exports = {
   MULTI_STRATEGY_VERSION,
-
   TERMINAL_PROVIDER_STATE_CODES,
-
   ERROR_PRIORITY,
 
   createMultiStrategyAdapter,
-
   pickStrongerError,
-
   shouldStopChain,
-
   isTerminalProviderState
 };
