@@ -8,16 +8,8 @@ const {
 );
 
 const MULTI_STRATEGY_VERSION =
-  '2026-08-13-terminal-state-v1';
+  '2026-08-13-terminal-state-v2';
 
-/*
- * ============================================================
- * TERMINAL PROVIDER STATES
- * ============================================================
- *
- * Jika dedicated adapter sudah berhasil membuktikan kondisi
- * ini, universal parser TIDAK BOLEH dijalankan lagi.
- */
 const TERMINAL_PROVIDER_STATE_CODES =
   new Set([
     'REGION_UNAVAILABLE',
@@ -26,9 +18,6 @@ const TERMINAL_PROVIDER_STATE_CODES =
     'MAINTENANCE'
   ]);
 
-/*
- * Provider state harus lebih kuat daripada PARSER_FAILED.
- */
 const ERROR_PRIORITY = {
   REGION_UNAVAILABLE:
     150,
@@ -165,7 +154,8 @@ function shouldStopChain(
     );
 
   /*
-   * PROVIDER STATE
+   * State provider yang sudah terbukti tidak boleh
+   * diteruskan ke universal parser.
    */
   if (
     TERMINAL_PROVIDER_STATE_CODES
@@ -176,9 +166,6 @@ function shouldStopChain(
     return true;
   }
 
-  /*
-   * RATE LIMITED
-   */
   if (
     code ===
     'RATE_LIMITED'
@@ -186,10 +173,6 @@ function shouldStopChain(
     return true;
   }
 
-  /*
-   * Error selain ACCESS_BLOCKED
-   * masih boleh melanjutkan chain.
-   */
   if (
     code !==
     'ACCESS_BLOCKED'
@@ -399,12 +382,8 @@ function createMultiStrategyAdapter(
             );
 
           /*
-           * ==================================================
-           * TERMINAL PROVIDER STATE
-           * ==================================================
-           *
-           * Jangan biarkan universal parser menimpa
-           * state yang sudah terbukti.
+           * Jangan lanjut ke universal jika state provider
+           * sudah berhasil dibuktikan.
            */
           if (
             isTerminalProviderState(
@@ -414,11 +393,6 @@ function createMultiStrategyAdapter(
             break;
           }
 
-          /*
-           * ==================================================
-           * PARSER RECOVERY
-           * ==================================================
-           */
           if (
             strategy.id ===
               'universal' &&
