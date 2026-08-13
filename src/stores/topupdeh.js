@@ -26,6 +26,29 @@ const STORE = {
     'TopUpDeh'
 };
 
+const INFRASTRUCTURE_ERRORS =
+  new Set([
+    'ACCESS_BLOCKED',
+    'RATE_LIMITED',
+    'NETWORK_DNS_ERROR',
+    'NETWORK_TLS_ERROR',
+    'NETWORK_CONNECTION_ERROR',
+    'NETWORK_CONNECT_TIMEOUT',
+    'NETWORK_FETCH_FAILED',
+    'TIMEOUT'
+  ]);
+
+function errorCode(
+  error
+) {
+  return String(
+    error?.code ||
+    ''
+  )
+    .trim()
+    .toUpperCase();
+}
+
 function toLive(
   offers
 ) {
@@ -134,6 +157,21 @@ module.exports = {
     ) {
       dedicatedError =
         error;
+
+      /*
+       * Jangan melakukan probe tambahan kalau origin
+       * memang blocked/rate-limited/network failure.
+       */
+      if (
+        INFRASTRUCTURE_ERRORS
+          .has(
+            errorCode(
+              error
+            )
+          )
+      ) {
+        throw error;
+      }
     }
 
     /*
@@ -166,14 +204,29 @@ module.exports = {
     ) {
       dynamicError =
         error;
+
+      if (
+        INFRASTRUCTURE_ERRORS
+          .has(
+            errorCode(
+              error
+            )
+          )
+      ) {
+        throw error;
+      }
     }
 
     /*
      * ========================================================
-     * 3. PROVIDER STATE
+     * 3. PRODUCT STATE PROBE
      * ========================================================
      *
-     * Section "Game Lainnya" dipotong sebelum harga diperiksa.
+     * product-state-probe.js memisahkan primary product
+     * section dari section "Game Lainnya".
+     *
+     * Karena itu harga milik game rekomendasi tidak lagi
+     * dianggap harga game target.
      */
     try {
       await probeDynamicProductState({
@@ -220,8 +273,8 @@ module.exports = {
     }
 
     /*
-     * Kalau primary section ternyata memang punya harga,
-     * tetapi parser gagal, pertahankan genuine parser error.
+     * Kalau probe tidak berhasil membuktikan dynamic
+     * product state, pertahankan error asli.
      */
     if (
       dynamicError
