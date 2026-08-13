@@ -1,7 +1,7 @@
 'use strict';
 
 const EXTENDED_PROVIDER_STATUS_VERSION =
-  '2026-08-13-provider-status-v1';
+  '2026-08-13-provider-status-v2';
 
 function classifyExtendedProviderFailure(
   error,
@@ -26,6 +26,28 @@ function classifyExtendedProviderFailure(
 
   if (
     code ===
+    'REGION_UNAVAILABLE'
+  ) {
+    return {
+      statusCode:
+        'REGION_UNAVAILABLE',
+
+      detailCode:
+        reason ||
+        'REGION_UNAVAILABLE',
+
+      httpStatus,
+
+      retryable:
+        false,
+
+      message:
+        'REGION UNAVAILABLE · Halaman Indonesia dialihkan ke region lain; harga non-IDR tidak digunakan'
+    };
+  }
+
+  if (
+    code ===
     'DYNAMIC_PRICE_REQUIRED'
   ) {
     return {
@@ -42,29 +64,8 @@ function classifyExtendedProviderFailure(
         false,
 
       message:
+        error?.message ||
         'DYNAMIC PRICE · Produk ditemukan, tetapi harga baru tersedia setelah interaksi/state halaman'
-    };
-  }
-
-  if (
-    code ===
-    'MAINTENANCE'
-  ) {
-    return {
-      statusCode:
-        'MAINTENANCE',
-
-      detailCode:
-        reason ||
-        'PRODUCT_MAINTENANCE',
-
-      httpStatus,
-
-      retryable:
-        false,
-
-      message:
-        'MAINTENANCE · Produk sedang dinonaktifkan sementara oleh toko'
     };
   }
 
@@ -86,21 +87,22 @@ function classifyExtendedProviderFailure(
         false,
 
       message:
+        error?.message ||
         'PRODUCT UNAVAILABLE · Produk/game sedang tidak tersedia pada toko'
     };
   }
 
   if (
     code ===
-    'REGION_UNAVAILABLE'
+    'MAINTENANCE'
   ) {
     return {
       statusCode:
-        'REGION_UNAVAILABLE',
+        'MAINTENANCE',
 
       detailCode:
         reason ||
-        'REGION_UNAVAILABLE',
+        'PRODUCT_MAINTENANCE',
 
       httpStatus,
 
@@ -108,7 +110,8 @@ function classifyExtendedProviderFailure(
         false,
 
       message:
-        'REGION UNAVAILABLE · Halaman Indonesia dialihkan ke region lain; harga non-IDR tidak digunakan'
+        error?.message ||
+        'MAINTENANCE · Produk sedang dinonaktifkan sementara oleh toko'
     };
   }
 
