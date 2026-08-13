@@ -5,7 +5,7 @@ const {
 } = require('../services/http');
 
 const PROVIDER_STATE_VERSION =
-  '2026-08-13-provider-state-v1';
+  '2026-08-13-provider-state-v2';
 
 function providerError(
   code,
@@ -86,6 +86,44 @@ function pageMentionsGame(
     );
 }
 
+function hasPositiveIdrPrice(
+  text
+) {
+  return /(?:\bIDR\b|\bRp\s*\.?)\s*[1-9][0-9.,]*/i
+    .test(
+      String(
+        text || ''
+      )
+    );
+}
+
+function pageMentionsGameUnit(
+  text,
+  game
+) {
+  const normalized =
+    ` ${normalizeText(text)} `;
+
+  return (
+    game?.unitAliases ||
+    []
+  )
+    .map(
+      normalizeText
+    )
+    .filter(
+      (value) =>
+        value &&
+        value.length >= 3
+    )
+    .some(
+      (unit) =>
+        normalized.includes(
+          ` ${unit} `
+        )
+    );
+}
+
 function classifyPageState({
   storeId,
   game,
@@ -106,8 +144,14 @@ function classifyPageState({
 
   /*
    * ========================================================
-   * REGION / CURRENCY MISMATCH
+   * CODASHOP REGION REDIRECT
    * ========================================================
+   *
+   * /id-id/...
+   *      ↓
+   * /en-us/...
+   *
+   * Harga USD tidak boleh dibaca sebagai IDR.
    */
   if (
     storeId ===
@@ -166,7 +210,7 @@ function classifyPageState({
 
   /*
    * ========================================================
-   * PRODUCT UNAVAILABLE
+   * EXPLICIT PRODUCT UNAVAILABLE
    * ========================================================
    */
   if (
@@ -187,30 +231,114 @@ function classifyPageState({
 
   /*
    * ========================================================
-   * DYNAMIC PRICE
+   * SEAGM DIRECT TOP-UP NOT AVAILABLE
+   * ========================================================
+   *
+   * SEAGM dapat masih mempunyai landing page game,
+   * tetapi hanya menampilkan Voucher Game generic tanpa
+   * direct denomination untuk currency game target.
+   */
+  if (
+    storeId ===
+      'seagm' &&
+    gameFound &&
+    /(?:voucher game|game voucher)/i
+      .test(raw) &&
+    !pageMentionsGameUnit(
+      raw,
+      game
+    ) &&
+    !hasPositiveIdrPrice(
+      raw
+    )
+  ) {
+    return {
+      code:
+        'PRODUCT_UNAVAILABLE',
+
+      reason:
+        'DIRECT_TOPUP_NOT_AVAILABLE',
+
+      message:
+        'PRODUCT UNAVAILABLE · Halaman game tersedia, tetapi direct top-up untuk nominal game target tidak tersedia'
+    };
+  }
+
+  /*
+   * ========================================================
+   * UNIPIN DYNAMIC PRICE
+   * ========================================================
+   */
+  if (
+    storeId ===
+      'unipin' &&
+    gameFound &&
+    /tidak tersedia untuk jumlah ini|this amount is currently unavailable/i
+      .test(raw)
+  ) {
+    return {
+      code:
+        'DYNAMIC_PRICE_REQUIRED',
+
+      reason:
+        'PAYMENT_STATE_REQUIRED',
+
+      message:
+        'DYNAMIC PRICE · Nominal ditemukan, tetapi harga baru tersedia setelah amount/payment state dipilih'
+    };
+  }
+
+  /*
+   * ========================================================
+   * TOPUPDEH DYNAMIC PRODUCT DATA
+   * ========================================================
+   */
+  if (
+    storeId ===
+      'topupdeh' &&
+    gameFound &&
+    /pilih nominal|select nominal|daftar nominal/i
+      .test(raw) &&
+    !hasPositiveIdrPrice(
+      raw
+    )
+  ) {
+    return {
+      code:
+        'DYNAMIC_PRICE_REQUIRED',
+
+      reason:
+        'DYNAMIC_PRODUCT_DATA',
+
+      message:
+        'DYNAMIC PRICE · Halaman game ditemukan, tetapi daftar nominal/harga dimuat melalui state/API halaman'
+    };
+  }
+
+  /*
+   * ========================================================
+   * GENERIC DYNAMIC PAGE SIGNATURES
    * ========================================================
    */
   if (
     gameFound &&
     (
-      /this amount is currently unavailable|tidak tersedia untuk jumlah ini/i
+      /memuat produk|loading products|loading product/i
         .test(raw) ||
 
       (
         /(?:\bIDR\b|\bRp\s*\.?)\s*0(?:[.,]00)?\b/i
           .test(raw) &&
-        /(?:pilih|select|choose).{0,40}(?:nominal|denomination|jumlah|amount|produk|product)/i
+        /(?:pilih|select|choose).{0,50}(?:nominal|denomination|jumlah|amount|produk|product)/i
           .test(raw)
       ) ||
 
-      /memuat produk|loading products|loading product/i
-        .test(raw) ||
-
       (
-        /(?:pilih|select|choose).{0,40}(?:nominal|denomination|produk|product)/i
+        /(?:pilih|select|choose).{0,50}(?:nominal|denomination|produk|product)/i
           .test(raw) &&
-        !/(?:\bIDR\b|\bRp\s*\.?)\s*[1-9][0-9.,]*/i
-          .test(raw)
+        !hasPositiveIdrPrice(
+          raw
+        )
       )
     )
   ) {
@@ -226,34 +354,6 @@ function classifyPageState({
     };
   }
 
-  /*
-   * Signatures khusus UniPin / TopUpDeh.
-   */
-  if (
-    gameFound &&
-    [
-      'unipin',
-      'topupdeh'
-    ].includes(
-      storeId
-    ) &&
-    /(?:user\s*id|zone\s*id|server|metode pembayaran|payment method|pilih nominal|select nominal)/i
-      .test(raw) &&
-    !/(?:\bIDR\b|\bRp\s*\.?)\s*[1-9][0-9.,]*/i
-      .test(raw)
-  ) {
-    return {
-      code:
-        'DYNAMIC_PRICE_REQUIRED',
-
-      reason:
-        'DYNAMIC_PRICE_REQUIRED',
-
-      message:
-        'DYNAMIC PRICE · Produk ditemukan, tetapi harga membutuhkan state/interaksi tambahan'
-    };
-  }
-
   return null;
 }
 
@@ -266,8 +366,7 @@ async function probeProviderState({
   expectedLocalePath = null,
   missingCatalogMeansUnavailable = false
 }) {
-  const attempts =
-    [];
+  const attempts = [];
 
   let reachablePage =
     false;
@@ -275,17 +374,19 @@ async function probeProviderState({
   let gameSeen =
     false;
 
+  const candidates = [
+    ...new Set(
+      (urls || [])
+        .filter(Boolean)
+    )
+  ].slice(
+    0,
+    6
+  );
+
   for (
     const requestedUrl of
-    [
-      ...new Set(
-        (urls || [])
-          .filter(Boolean)
-      )
-    ].slice(
-      0,
-      5
-    )
+    candidates
   ) {
     try {
       const page =
@@ -383,6 +484,13 @@ async function probeProviderState({
     } catch (
       error
     ) {
+      const code =
+        String(
+          error?.code ||
+          ''
+        )
+          .toUpperCase();
+
       if (
         [
           'REGION_UNAVAILABLE',
@@ -390,11 +498,7 @@ async function probeProviderState({
           'PRODUCT_UNAVAILABLE',
           'DYNAMIC_PRICE_REQUIRED'
         ].includes(
-          String(
-            error?.code ||
-            ''
-          )
-            .toUpperCase()
+          code
         )
       ) {
         throw error;
@@ -414,12 +518,6 @@ async function probeProviderState({
     }
   }
 
-  /*
-   * Untuk GGWP:
-   *
-   * halaman toko dapat diakses tetapi game target
-   * sama sekali tidak ditemukan pada katalog.
-   */
   if (
     missingCatalogMeansUnavailable &&
     reachablePage &&
