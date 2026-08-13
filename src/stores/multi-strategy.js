@@ -7,46 +7,52 @@ const {
   './parser-recovery'
 );
 
-/*
- * Marker untuk memastikan runtime menggunakan
- * multi-strategy terbaru.
- */
 const MULTI_STRATEGY_VERSION =
-  '2026-08-12-multi-v2';
+  '2026-08-12-multi-v3';
 
 /*
  * ============================================================
  * ERROR PRIORITY
  * ============================================================
  *
- * ACCESS_BLOCKED / RATE_LIMITED harus lebih kuat
- * daripada PARSER_FAILED.
+ * Priority ini sengaja mengikuti flow yang sebelumnya
+ * membuat SEAGM berhasil.
  *
- * Kalau dedicated benar-benar menerima 403,
- * jangan menutupinya dengan PARSER_FAILED lama.
+ * Jangan menaikkan ACCESS_BLOCKED di atas PARSER_FAILED
+ * pada patch ini karena perubahan tersebut sempat membuat
+ * behaviour provider berubah.
  */
 const ERROR_PRIORITY = {
-  RATE_LIMITED: 120,
-  ACCESS_BLOCKED: 115,
-
   PARSER_FAILED: 100,
+
   PAGE_NOT_VERIFIED: 95,
 
+  ACCESS_BLOCKED: 90,
+
+  RATE_LIMITED: 88,
+
   NETWORK_TLS_ERROR: 80,
+
   NETWORK_CONNECTION_ERROR: 78,
+
   NETWORK_DNS_ERROR: 76,
+
   NETWORK_CONNECT_TIMEOUT: 74,
+
   NETWORK_FETCH_FAILED: 72,
 
   TIMEOUT: 70,
 
   UPSTREAM_ERROR: 60,
+
   HTTP_ERROR: 50,
 
   DISCOVERY_BLOCKED: 40,
+
   CANDIDATE_BLOCKED: 35,
 
   PAGE_NOT_FOUND: 20,
+
   NOT_CONFIGURED: 10
 };
 
@@ -106,8 +112,7 @@ function shouldStopChain(
       .toUpperCase();
 
   /*
-   * Rate limit:
-   * jangan tambah request lagi.
+   * RATE LIMIT
    */
   if (
     code ===
@@ -116,6 +121,10 @@ function shouldStopChain(
     return true;
   }
 
+  /*
+   * Error selain ACCESS_BLOCKED
+   * masih boleh lanjut.
+   */
   if (
     code !==
     'ACCESS_BLOCKED'
@@ -124,7 +133,7 @@ function shouldStopChain(
   }
 
   /*
-   * Public API dapat mempunyai policy sendiri.
+   * Public API boleh mempunyai policy sendiri.
    */
   if (
     strategyId ===
@@ -139,8 +148,6 @@ function shouldStopChain(
 
   /*
    * Dedicated adapter diblokir.
-   *
-   * Default hentikan request ke origin yang sama.
    */
   if (
     strategyId ===
@@ -158,107 +165,24 @@ function shouldStopChain(
 
 /*
  * ============================================================
- * SEAGM IDR VALIDATION
+ * SOURCE NORMALIZATION
  * ============================================================
  *
- * Mencegah numeric foreign currency seperti:
+ * Hasil:
  *
- * 0.99
- * 1
- * 99
+ * recovery-visible
+ * recovery-serialized
+ * recovery-catalog
+ * dedicated-visible
+ * dedicated-serialized
  *
- * berubah menjadi Rp1 / Rp99.
- */
-function hasExplicitIdrEvidence(
-  offer
-) {
-  const priceText =
-    String(
-      offer?.priceText ||
-      ''
-    );
-
-  return (
-    /(?:\bIDR\b|\bRp\s*\.?)/i
-      .test(
-        priceText
-      )
-  );
-}
-
-function shouldKeepOffer(
-  offer,
-  strategyId,
-  store
-) {
-  if (
-    !offer ||
-    typeof offer !==
-    'object'
-  ) {
-    return false;
-  }
-
-  const price =
-    Number(
-      offer.finalPrice ??
-      offer.productPrice
-    );
-
-  if (
-    !Number.isFinite(
-      price
-    ) ||
-    price <=
-      0
-  ) {
-    return false;
-  }
-
-  /*
-   * Rule ini hanya berlaku pada SEAGM recovery.
-   *
-   * Store lain tidak terkena.
-   */
-  if (
-    store?.id ===
-      'seagm' &&
-    strategyId ===
-      'parser-recovery'
-  ) {
-    if (
-      !hasExplicitIdrEvidence(
-        offer
-      )
-    ) {
-      return false;
-    }
-
-    /*
-     * Harga di bawah Rp100 tidak realistis
-     * untuk hasil recovery SEAGM dan biasanya
-     * merupakan foreign-currency decimal.
-     */
-    if (
-      price <
-      100
-    ) {
-      return false;
-    }
-  }
-
-  return true;
-}
-
-/*
- * ============================================================
- * LIVE / DEMO NORMALIZATION
- * ============================================================
+ * semuanya berasal dari fetch toko sebenarnya.
  *
- * Hasil dedicated / universal / recovery adalah data
- * yang benar-benar di-fetch dari toko.
+ * Frontend VoucherLens saat ini menganggap hanya
+ * source === "live" sebagai Live.
  *
- * Hanya fallback/demo source yang tetap dianggap Demo.
+ * Karena itu sumber asli disimpan ke extractionSource,
+ * sedangkan source dinormalisasi menjadi live.
  */
 function normalizeOfferSource(
   offer,
@@ -271,34 +195,28 @@ function normalizeOfferSource(
     )
       .trim();
 
-  const sourceKey =
+  const normalizedSource =
     originalSource
       .toLowerCase();
 
-  const isDemo =
-    sourceKey ===
+  const isDemoSource =
+    normalizedSource ===
       'fallback' ||
-    sourceKey ===
+    normalizedSource ===
       'demo';
 
   return {
     ...offer,
 
-    /*
-     * Simpan sumber parser asli untuk debugging.
-     */
+    source:
+      isDemoSource
+        ? 'fallback'
+        : 'live',
+
     extractionSource:
       offer?.extractionSource ||
       originalSource ||
       strategyId,
-
-    /*
-     * Frontend saat ini menggunakan source === live.
-     */
-    source:
-      isDemo
-        ? 'fallback'
-        : 'live',
 
     accessStrategy:
       offer?.accessStrategy ||
@@ -307,6 +225,92 @@ function normalizeOfferSource(
     multiStrategyVersion:
       MULTI_STRATEGY_VERSION
   };
+}
+
+/*
+ * ============================================================
+ * OFFER VALIDATION
+ * ============================================================
+ *
+ * Khusus SEAGM parser recovery:
+ *
+ * jangan tampilkan harga asing seperti:
+ *
+ * NZ$ 0.99
+ * NZ$ 1.45
+ *
+ * sebagai:
+ *
+ * Rp1
+ * Rp99
+ *
+ * Tetapi IMPORTANT:
+ *
+ * offer invalid hanya difilter dari hasil,
+ * TIDAK menyebabkan strategy berubah menjadi
+ * PARSER_FAILED.
+ *
+ * Inilah perbedaan penting dari patch sebelumnya.
+ */
+function isUsableOffer(
+  offer,
+  strategyId,
+  store
+) {
+  if (
+    !offer ||
+    typeof offer !==
+      'object'
+  ) {
+    return false;
+  }
+
+  if (
+    store?.id ===
+      'seagm' &&
+    strategyId ===
+      'parser-recovery'
+  ) {
+    const priceText =
+      String(
+        offer?.priceText ||
+        ''
+      );
+
+    const price =
+      Number(
+        offer.finalPrice ??
+        offer.productPrice
+      );
+
+    /*
+     * Recovery SEAGM hanya ditampilkan jika ada
+     * bukti eksplisit currency Rupiah.
+     */
+    if (
+      !/(?:\bIDR\b|\bRp\s*\.?)/i
+        .test(
+          priceText
+        )
+    ) {
+      return false;
+    }
+
+    /*
+     * Hindari bogus Rp1 / Rp99.
+     */
+    if (
+      !Number.isFinite(
+        price
+      ) ||
+      price <
+        100
+    ) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 function mapOffersWithStrategy(
@@ -325,7 +329,7 @@ function mapOffersWithStrategy(
   return offers
     .filter(
       (offer) =>
-        shouldKeepOffer(
+        isUsableOffer(
           offer,
           strategyId,
           store
@@ -338,55 +342,6 @@ function mapOffersWithStrategy(
           strategyId
         )
     );
-}
-
-function createNoValidOffersError(
-  store,
-  strategyId,
-  rawOffers
-) {
-  const error =
-    new Error(
-      store?.id ===
-        'seagm' &&
-      strategyId ===
-        'parser-recovery'
-        ? 'SEAGM recovery tidak mempunyai harga IDR yang tervalidasi'
-        : 'Strategy tidak mengembalikan offer valid'
-    );
-
-  error.code =
-    'PARSER_FAILED';
-
-  error.parserReason =
-    store?.id ===
-      'seagm' &&
-    strategyId ===
-      'parser-recovery'
-      ? 'CURRENCY_NOT_CONFIRMED_IDR'
-      : 'NO_VALID_OFFERS';
-
-  error
-    .offerValidationDiagnostics = {
-      multiStrategyVersion:
-        MULTI_STRATEGY_VERSION,
-
-      storeId:
-        store?.id ||
-        null,
-
-      strategy:
-        strategyId,
-
-      rawCount:
-        Array.isArray(
-          rawOffers
-        )
-          ? rawOffers.length
-          : 0
-    };
-
-  return error;
 }
 
 function attemptLog(
@@ -458,35 +413,13 @@ function createMultiStrategyAdapter(
            * NORMAL STRATEGY
            * ==================================================
            */
-          const rawOffers =
+          const offers =
             await strategy
               .adapter
               .fetchOffers(
                 game,
                 options
               );
-
-          const offers =
-            mapOffersWithStrategy(
-              rawOffers,
-              strategy.id,
-              store
-            );
-
-          /*
-           * Kalau adapter selesai tanpa exception tetapi
-           * ternyata tidak mempunyai offer valid, anggap gagal
-           * dan lanjutkan ke strategy berikutnya.
-           */
-          if (
-            !offers.length
-          ) {
-            throw createNoValidOffersError(
-              store,
-              strategy.id,
-              rawOffers
-            );
-          }
 
           attempts.push(
             attemptLog(
@@ -496,15 +429,12 @@ function createMultiStrategyAdapter(
                 ok:
                   true,
 
-                rawCount:
-                  Array.isArray(
-                    rawOffers
-                  )
-                    ? rawOffers.length
-                    : 0,
-
                 count:
-                  offers.length
+                  Array.isArray(
+                    offers
+                  )
+                    ? offers.length
+                    : 0
               }
             )
           );
@@ -519,7 +449,19 @@ function createMultiStrategyAdapter(
             attempts
           };
 
-          return offers;
+          /*
+           * Penting:
+           *
+           * hasil filter boleh menjadi [].
+           *
+           * Jangan throw PARSER_FAILED di sini,
+           * supaya SEAGM tidak regression lagi.
+           */
+          return mapOffersWithStrategy(
+            offers,
+            strategy.id,
+            store
+          );
         } catch (
           error
         ) {
@@ -549,19 +491,9 @@ function createMultiStrategyAdapter(
                     ?.message ||
                   null,
 
-                /*
-                 * Dedicated parser diagnostics akan terlihat
-                 * di sini jika dedicated adapter sudah benar-
-                 * benar berjalan.
-                 */
                 dedicatedDiagnostics:
                   error
                     ?.dedicatedDiagnostics ||
-                  null,
-
-                offerValidationDiagnostics:
-                  error
-                    ?.offerValidationDiagnostics ||
                   null
               }
             )
@@ -577,8 +509,6 @@ function createMultiStrategyAdapter(
            * ==================================================
            * PARSER RECOVERY
            * ==================================================
-           *
-           * Recovery tetap berjalan setelah universal gagal.
            */
           if (
             strategy.id ===
@@ -592,36 +522,13 @@ function createMultiStrategyAdapter(
               Date.now();
 
             try {
-              const rawRecoveredOffers =
+              const recoveredOffers =
                 await tryParserRecovery(
                   store,
                   game,
                   options,
                   error
                 );
-
-              const recoveredOffers =
-                mapOffersWithStrategy(
-                  rawRecoveredOffers,
-                  'parser-recovery',
-                  store
-                );
-
-              /*
-               * Penting untuk SEAGM:
-               * invalid foreign-currency price tidak boleh
-               * dianggap sukses.
-               */
-              if (
-                !recoveredOffers
-                  .length
-              ) {
-                throw createNoValidOffersError(
-                  store,
-                  'parser-recovery',
-                  rawRecoveredOffers
-                );
-              }
 
               attempts.push(
                 attemptLog(
@@ -631,17 +538,13 @@ function createMultiStrategyAdapter(
                     ok:
                       true,
 
-                    rawCount:
-                      Array.isArray(
-                        rawRecoveredOffers
-                      )
-                        ? rawRecoveredOffers
-                            .length
-                        : 0,
-
                     count:
-                      recoveredOffers
-                        .length
+                      Array.isArray(
+                        recoveredOffers
+                      )
+                        ? recoveredOffers
+                            .length
+                        : 0
                   }
                 )
               );
@@ -656,7 +559,18 @@ function createMultiStrategyAdapter(
                 attempts
               };
 
-              return recoveredOffers;
+              /*
+               * Sama seperti normal strategy:
+               *
+               * jika seluruh offer SEAGM ternyata bukan IDR,
+               * hasil boleh [] tanpa mengubah provider menjadi
+               * PARSER_FAILED.
+               */
+              return mapOffersWithStrategy(
+                recoveredOffers,
+                'parser-recovery',
+                store
+              );
             } catch (
               recoveryError
             ) {
@@ -686,11 +600,6 @@ function createMultiStrategyAdapter(
                     message:
                       recoveryError
                         ?.message ||
-                      null,
-
-                    offerValidationDiagnostics:
-                      recoveryError
-                        ?.offerValidationDiagnostics ||
                       null,
 
                     recoveryDiagnostics:
@@ -765,7 +674,10 @@ function createMultiStrategyAdapter(
 
 module.exports = {
   MULTI_STRATEGY_VERSION,
+
   createMultiStrategyAdapter,
+
   pickStrongerError,
+
   shouldStopChain
 };
