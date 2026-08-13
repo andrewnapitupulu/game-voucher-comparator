@@ -20,6 +20,29 @@ const STORE = {
     'BXYStore'
 };
 
+const INFRASTRUCTURE_ERRORS =
+  new Set([
+    'ACCESS_BLOCKED',
+    'RATE_LIMITED',
+    'NETWORK_DNS_ERROR',
+    'NETWORK_TLS_ERROR',
+    'NETWORK_CONNECTION_ERROR',
+    'NETWORK_CONNECT_TIMEOUT',
+    'NETWORK_FETCH_FAILED',
+    'TIMEOUT'
+  ]);
+
+function errorCode(
+  error
+) {
+  return String(
+    error?.code ||
+    ''
+  )
+    .trim()
+    .toUpperCase();
+}
+
 function urlsFor(
   game
 ) {
@@ -41,17 +64,28 @@ function urlsFor(
     ],
 
     /*
-     * Catalog locale digunakan sebagai evidence
-     * keberadaan game, bukan sebagai sumber harga.
+     * Catalog pages hanya digunakan sebagai evidence
+     * bahwa game tersedia.
+     *
+     * Catalog tidak digunakan sebagai sumber
+     * product-price pairing.
      */
     discoveryPages: [
       'https://bxystore.com/en-id',
       'https://bxystore.com/en-id/products',
+
       'https://bxystore.com/my-id',
       'https://bxystore.com/my-id/products',
+
+      'https://bxystore.com/fil-id',
+      'https://bxystore.com/fil-id/products',
+
+      'https://bxystore.com/th-id',
       'https://bxystore.com/th-id/products',
+
       'https://bxystore.com/ja-id/products',
       'https://bxystore.com/vi-id/products',
+
       'https://bxystore.com/'
     ]
   };
@@ -76,6 +110,11 @@ module.exports = {
     let strictError =
       null;
 
+    /*
+     * ========================================================
+     * 1. STRICT PRODUCT-PRICE PAIRING
+     * ========================================================
+     */
     try {
       const offers =
         await fetchStrictStoreOffers({
@@ -108,12 +147,31 @@ module.exports = {
     ) {
       strictError =
         error;
+
+      /*
+       * Jangan request ulang untuk infrastructure failure.
+       */
+      if (
+        INFRASTRUCTURE_ERRORS
+          .has(
+            errorCode(
+              error
+            )
+          )
+      ) {
+        throw error;
+      }
     }
 
     /*
-     * Kalau game ditemukan pada katalog BXY tetapi
-     * product-price pair tidak tersedia sebagai server-
-     * rendered data, treat sebagai dynamic data.
+     * ========================================================
+     * 2. PRODUCT STATE PROBE
+     * ========================================================
+     *
+     * BXYStore boleh membuktikan keberadaan game melalui
+     * catalog page.
+     *
+     * Tetapi harga catalog tidak dipakai untuk membuat offer.
      */
     try {
       await probeDynamicProductState({
@@ -136,7 +194,8 @@ module.exports = {
     ) {
       stateError.previousStrictError = {
         code:
-          strictError?.code ||
+          strictError
+            ?.code ||
           null,
 
         parserReason:
@@ -148,6 +207,10 @@ module.exports = {
       throw stateError;
     }
 
+    /*
+     * Kalau game/product state tidak dapat dibuktikan,
+     * pertahankan genuine parser error.
+     */
     if (
       strictError
     ) {
