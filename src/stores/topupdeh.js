@@ -58,23 +58,24 @@ function toLive(
     )
       ? offers
       : []
-  ).map(
-    (offer) => ({
-      ...offer,
+  )
+    .map(
+      (offer) => ({
+        ...offer,
 
-      extractionSource:
-        offer?.extractionSource ||
-        offer?.source ||
-        'dedicated',
+        extractionSource:
+          offer?.extractionSource ||
+          offer?.source ||
+          'dedicated',
 
-      source:
-        'live',
+        source:
+          'live',
 
-      accessStrategy:
-        offer?.accessStrategy ||
-        'dedicated'
-    })
-  );
+        accessStrategy:
+          offer?.accessStrategy ||
+          'dedicated'
+      })
+    );
 }
 
 function pageUrlsFor(
@@ -87,9 +88,7 @@ function pageUrlsFor(
 
   return [
     `https://topupdeh.id/${slug}`,
-
     `https://topupdeh.id/games/${slug}`,
-
     `https://topupdeh.id/game/${slug}`
   ];
 }
@@ -117,9 +116,7 @@ module.exports = {
       null;
 
     /*
-     * ========================================================
-     * 1. DEDICATED
-     * ========================================================
+     * 1. Dedicated parser.
      */
     try {
       const offers =
@@ -179,9 +176,7 @@ module.exports = {
     }
 
     /*
-     * ========================================================
-     * 2. DYNAMIC ENDPOINT
-     * ========================================================
+     * 2. Dynamic endpoint recovery.
      */
     try {
       const offers =
@@ -224,14 +219,11 @@ module.exports = {
     }
 
     /*
-     * ========================================================
-     * 3. STATE PROBE
-     * ========================================================
+     * 3. Provider/product state.
      *
-     * URL game target sudah valid tetapi extractor
-     * tidak menemukan pasangan nominal-harga.
-     *
-     * Harga pada "Game Lainnya" tidak dihitung.
+     * Kalau URL game target valid tetapi exact product-price
+     * pair tidak ada pada server-rendered content, jangan
+     * classify sebagai PARSER_FAILED.
      */
     try {
       await probeDynamicProductState({
