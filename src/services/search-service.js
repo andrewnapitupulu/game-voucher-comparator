@@ -38,6 +38,12 @@ const {
   '../stores'
 );
 
+const {
+  classifyExtendedProviderFailure
+} = require(
+  './provider-failure-extensions'
+);
+
 function envBoolean(
   name,
   fallback
@@ -304,6 +310,27 @@ function classifyProviderFailure(
       error,
       message
     );
+
+    /*
+   * ========================================================
+   * EXTENDED PROVIDER STATES
+   * ========================================================
+   *
+   * Harus diperiksa SEBELUM PARSER_FAILED.
+   */
+  const extendedFailure =
+    classifyExtendedProviderFailure(
+      error,
+      {
+        httpStatus
+      }
+    );
+
+  if (
+    extendedFailure
+  ) {
+    return extendedFailure;
+  }
 
   if (
     code ===
