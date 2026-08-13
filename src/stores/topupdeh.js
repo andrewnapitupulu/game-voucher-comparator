@@ -12,6 +12,12 @@ const {
   './dynamic-page-recovery'
 );
 
+const {
+  probeDynamicProductState
+} = require(
+  './product-state-probe'
+);
+
 const STORE = {
   id:
     'topupdeh',
@@ -52,9 +58,7 @@ function pageUrlsFor(
 
   return [
     `https://topupdeh.id/${slug}`,
-
     `https://topupdeh.id/games/${slug}`,
-
     `https://topupdeh.id/game/${slug}`
   ];
 }
@@ -75,6 +79,17 @@ module.exports = {
         game
       );
 
+    let dedicatedError =
+      null;
+
+    let dynamicError =
+      null;
+
+    /*
+     * ========================================================
+     * 1. DEDICATED PARSER
+     * ========================================================
+     */
     try {
       const offers =
         await fetchDedicatedOffers({
@@ -105,6 +120,9 @@ module.exports = {
         });
 
       if (
+        Array.isArray(
+          offers
+        ) &&
         offers.length
       ) {
         return toLive(
@@ -112,10 +130,20 @@ module.exports = {
         );
       }
     } catch (
-      firstError
+      error
     ) {
-      try {
-        return await fetchDynamicOffers({
+      dedicatedError =
+        error;
+    }
+
+    /*
+     * ========================================================
+     * 2. DYNAMIC ENDPOINT RECOVERY
+     * ========================================================
+     */
+    try {
+      const offers =
+        await fetchDynamicOffers({
           store:
             STORE,
 
@@ -124,25 +152,100 @@ module.exports = {
 
           pageUrls
         });
-      } catch (
-        dynamicError
+
+      if (
+        Array.isArray(
+          offers
+        ) &&
+        offers.length
       ) {
-        dynamicError
-          .previousDedicatedError = {
-            code:
-              firstError?.code ||
-              null,
-
-            parserReason:
-              firstError
-                ?.parserReason ||
-              null
-          };
-
-        throw dynamicError;
+        return offers;
       }
+    } catch (
+      error
+    ) {
+      dynamicError =
+        error;
     }
 
-    return [];
+    /*
+     * ========================================================
+     * 3. PROVIDER STATE
+     * ========================================================
+     *
+     * Section "Game Lainnya" dipotong sebelum harga diperiksa.
+     */
+    try {
+      await probeDynamicProductState({
+        store:
+          STORE,
+
+        game,
+        options,
+
+        urls:
+          pageUrls,
+
+        allowCatalogEvidence:
+          false
+      });
+    } catch (
+      stateError
+    ) {
+      stateError.previousDedicatedError = {
+        code:
+          dedicatedError
+            ?.code ||
+          null,
+
+        parserReason:
+          dedicatedError
+            ?.parserReason ||
+          null
+      };
+
+      stateError.previousDynamicError = {
+        code:
+          dynamicError
+            ?.code ||
+          null,
+
+        parserReason:
+          dynamicError
+            ?.parserReason ||
+          null
+      };
+
+      throw stateError;
+    }
+
+    /*
+     * Kalau primary section ternyata memang punya harga,
+     * tetapi parser gagal, pertahankan genuine parser error.
+     */
+    if (
+      dynamicError
+    ) {
+      throw dynamicError;
+    }
+
+    if (
+      dedicatedError
+    ) {
+      throw dedicatedError;
+    }
+
+    const error =
+      new Error(
+        'TopUpDeh tidak menghasilkan offer yang dapat diverifikasi'
+      );
+
+    error.code =
+      'PARSER_FAILED';
+
+    error.parserReason =
+      'NO_VALID_OFFERS';
+
+    throw error;
   }
 };
