@@ -6,7 +6,43 @@ const {
   './dedicated-store-parser'
 );
 
-function candidatesFor(
+const {
+  fetchDynamicOffers
+} = require(
+  './dynamic-page-recovery'
+);
+
+const STORE = {
+  id:
+    'oura-store',
+
+  name:
+    'Oura Store'
+};
+
+function toLive(
+  offers
+) {
+  return offers.map(
+    (offer) => ({
+      ...offer,
+
+      extractionSource:
+        offer.extractionSource ||
+        offer.source ||
+        'dedicated',
+
+      source:
+        'live',
+
+      accessStrategy:
+        offer.accessStrategy ||
+        'dedicated'
+    })
+  );
+}
+
+function pageUrlsFor(
   game
 ) {
   const slug =
@@ -15,71 +51,98 @@ function candidatesFor(
     );
 
   return [
-    {
-      url:
-        `https://www.ourastore.com/id-id/${slug}?from=undefined`,
+    `https://www.ourastore.com/id-id/${slug}`,
 
-      mode:
-        'page'
-    },
+    `https://www.ourastore.com/id-id/${slug}?from=undefined`,
 
-    {
-      url:
-        `https://www.ourastore.com/id-id/${slug}`,
-
-      mode:
-        'page'
-    },
-
-    {
-      url:
-        `https://ourastore.com/id-id/${slug}?from=undefined`,
-
-      mode:
-        'page'
-    }
+    `https://ourastore.com/id-id/${slug}`
   ];
 }
 
 module.exports = {
   id:
-    'oura-store',
+    STORE.id,
 
   name:
-    'Oura Store',
+    STORE.name,
 
   async fetchOffers(
     game,
     options = {}
   ) {
-    return fetchDedicatedOffers({
-      storeId:
-        'oura-store',
+    const pageUrls =
+      pageUrlsFor(
+        game
+      );
 
-      storeName:
-        'Oura Store',
+    try {
+      const offers =
+        await fetchDedicatedOffers({
+          storeId:
+            STORE.id,
 
-      game,
-      options,
+          storeName:
+            STORE.name,
 
-      candidates:
-        candidatesFor(
-          game
-        ),
+          game,
+          options,
 
-      /*
-       * Jika HTML biasa tidak membawa offers,
-       * cari serialized state, JS bundle,
-       * dan endpoint GET read-only yang ditemukan.
-       */
-      enableDynamicDiscovery:
-        true,
+          candidates:
+            pageUrls.map(
+              (url) => ({
+                url,
 
-      minOffers:
-        game.id ===
-        'mobile-legends'
-          ? 2
-          : 1
-    });
+                mode:
+                  'page'
+              })
+            ),
+
+          enableDynamicDiscovery:
+            true,
+
+          minOffers:
+            1
+        });
+
+      if (
+        offers.length
+      ) {
+        return toLive(
+          offers
+        );
+      }
+    } catch (
+      firstError
+    ) {
+      try {
+        return await fetchDynamicOffers({
+          store:
+            STORE,
+
+          game,
+          options,
+
+          pageUrls
+        });
+      } catch (
+        dynamicError
+      ) {
+        dynamicError
+          .previousDedicatedError = {
+            code:
+              firstError?.code ||
+              null,
+
+            parserReason:
+              firstError
+                ?.parserReason ||
+              null
+          };
+
+        throw dynamicError;
+      }
+    }
+
+    return [];
   }
 };
