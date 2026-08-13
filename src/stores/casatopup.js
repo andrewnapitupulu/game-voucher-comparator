@@ -20,6 +20,29 @@ const STORE = {
     'CasaTopup'
 };
 
+const INFRASTRUCTURE_ERRORS =
+  new Set([
+    'ACCESS_BLOCKED',
+    'RATE_LIMITED',
+    'NETWORK_DNS_ERROR',
+    'NETWORK_TLS_ERROR',
+    'NETWORK_CONNECTION_ERROR',
+    'NETWORK_CONNECT_TIMEOUT',
+    'NETWORK_FETCH_FAILED',
+    'TIMEOUT'
+  ]);
+
+function errorCode(
+  error
+) {
+  return String(
+    error?.code ||
+    ''
+  )
+    .trim()
+    .toUpperCase();
+}
+
 function urlsFor(
   game
 ) {
@@ -31,14 +54,19 @@ function urlsFor(
   return {
     candidates: [
       `https://casatopup.com/beli/${slug}`,
+
       `https://casatopup.com/id/beli/${slug}`,
+
       `https://casatopup.com/en/beli/${slug}`,
+
       `https://casatopup.com/${slug}`
     ],
 
     discoveryPages: [
       'https://casatopup.com/id',
+
       'https://casatopup.com/en',
+
       'https://casatopup.com/'
     ]
   };
@@ -63,6 +91,11 @@ module.exports = {
     let strictError =
       null;
 
+    /*
+     * ========================================================
+     * 1. STRICT EXTRACTION
+     * ========================================================
+     */
     try {
       const offers =
         await fetchStrictStoreOffers({
@@ -95,16 +128,30 @@ module.exports = {
     ) {
       strictError =
         error;
+
+      if (
+        INFRASTRUCTURE_ERRORS
+          .has(
+            errorCode(
+              error
+            )
+          )
+      ) {
+        throw error;
+      }
     }
 
     /*
      * ========================================================
-     * STATE FALLBACK
+     * 2. STATE PROBE
      * ========================================================
      *
-     * Kalau canonical product page membuktikan game target
-     * tetapi primary section tidak membawa harga IDR,
-     * statusnya dynamic, bukan parser failed.
+     * Satu angka Rp acak tidak lagi dianggap sebagai
+     * bukti harga produk.
+     *
+     * Evidence harga harus berupa:
+     *
+     * unit game + harga IDR berdekatan.
      */
     try {
       await probeDynamicProductState({
@@ -116,11 +163,15 @@ module.exports = {
 
         urls: [
           ...urls.candidates,
+
           ...urls.discoveryPages
         ],
 
         allowCatalogEvidence:
-          false
+          false,
+
+        trustVerifiedGameUrlWithoutPair:
+          true
       });
     } catch (
       stateError
