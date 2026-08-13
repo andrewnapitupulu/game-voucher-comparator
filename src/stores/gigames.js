@@ -6,6 +6,42 @@ const {
   './dedicated-store-parser'
 );
 
+const {
+  fetchDynamicOffers
+} = require(
+  './dynamic-page-recovery'
+);
+
+const STORE = {
+  id:
+    'gigames',
+
+  name:
+    'Gigames'
+};
+
+function toLive(
+  offers
+) {
+  return offers.map(
+    (offer) => ({
+      ...offer,
+
+      extractionSource:
+        offer.extractionSource ||
+        offer.source ||
+        'dedicated',
+
+      source:
+        'live',
+
+      accessStrategy:
+        offer.accessStrategy ||
+        'dedicated'
+    })
+  );
+}
+
 function candidatesFor(
   game
 ) {
@@ -14,7 +50,60 @@ function candidatesFor(
       game.id
     );
 
-  const candidates = [
+  const candidates =
+    [];
+
+  if (
+    game.id ===
+    'wuthering-waves'
+  ) {
+    candidates.push({
+      url:
+        'https://www.gigames.id/id/beli/wuthering-waves',
+
+      mode:
+        'page'
+    });
+  }
+
+  if (
+    game.id ===
+    'mobile-legends'
+  ) {
+    candidates.push({
+      url:
+        'https://www.gigames.id/beli/mobile-legends-global',
+
+      mode:
+        'page'
+    });
+  }
+
+  candidates.push(
+    {
+      url:
+        `https://www.gigames.id/id/beli/${slug}`,
+
+      mode:
+        'page'
+    },
+
+    {
+      url:
+        `https://www.gigames.id/beli/${slug}`,
+
+      mode:
+        'page'
+    },
+
+    {
+      url:
+        `https://www.gigames.id/en/beli/${slug}`,
+
+      mode:
+        'page'
+    },
+
     {
       url:
         'https://www.gigames.id/services',
@@ -25,95 +114,102 @@ function candidatesFor(
 
     {
       url:
-        'https://gigames.id/en',
+        'https://www.gigames.id/fil/products',
 
       mode:
         'catalog'
-    },
-
-    {
-      url:
-        `https://gigames.id/beli/${slug}`,
-
-      mode:
-        'page'
-    },
-
-    {
-      url:
-        `https://gigames.id/id/beli/${slug}`,
-
-      mode:
-        'page'
-    },
-
-    {
-      url:
-        `https://gigames.id/en/beli/${slug}`,
-
-      mode:
-        'page'
     }
-  ];
-
-  /*
-   * Mobile Legends Gigames mempunyai
-   * route khusus yang saat ini valid.
-   */
-  if (
-    game.id ===
-    'mobile-legends'
-  ) {
-    candidates.splice(
-      2,
-      0,
-      {
-        url:
-          'https://gigames.id/beli/mobile-legends-global',
-
-        mode:
-          'page'
-      }
-    );
-  }
+  );
 
   return candidates;
 }
 
 module.exports = {
   id:
-    'gigames',
+    STORE.id,
 
   name:
-    'Gigames',
+    STORE.name,
 
   async fetchOffers(
     game,
     options = {}
   ) {
-    return fetchDedicatedOffers({
-      storeId:
-        'gigames',
+    const candidates =
+      candidatesFor(
+        game
+      );
 
-      storeName:
-        'Gigames',
+    try {
+      const offers =
+        await fetchDedicatedOffers({
+          storeId:
+            STORE.id,
 
-      game,
-      options,
+          storeName:
+            STORE.name,
 
-      candidates:
-        candidatesFor(
-          game
-        ),
+          game,
+          options,
 
-      enableDynamicDiscovery:
-        false,
+          candidates,
 
-      minOffers:
-        game.id ===
-        'mobile-legends'
-          ? 2
-          : 1
-    });
+          enableDynamicDiscovery:
+            true,
+
+          minOffers:
+            1
+        });
+
+      if (
+        offers.length
+      ) {
+        return toLive(
+          offers
+        );
+      }
+    } catch (
+      firstError
+    ) {
+      try {
+        return await fetchDynamicOffers({
+          store:
+            STORE,
+
+          game,
+          options,
+
+          pageUrls:
+            candidates
+              .filter(
+                (item) =>
+                  item.mode ===
+                  'page'
+              )
+              .map(
+                (item) =>
+                  item.url
+              )
+        });
+      } catch (
+        dynamicError
+      ) {
+        dynamicError
+          .previousDedicatedError = {
+            code:
+              firstError?.code ||
+              null,
+
+            parserReason:
+              firstError
+                ?.parserReason ||
+              null
+          };
+
+        throw dynamicError;
+      }
+    }
+
+    return [];
   }
 };
