@@ -1,179 +1,90 @@
 'use strict';
 
-const codashopLegacy = require('./codashop');
-const unipinLegacy = require('./unipin');
-const lapakgaming = require('./lapakgaming');
-const duniagames = require('./duniagames');
+const codashop =
+  require(
+    './codashop'
+  );
 
-const {
-  stateAwareRecoveryAdapters,
-  createLegacyThenStateAwareRecoveryAdapter,
-  STATE_AWARE_RECOVERY_VERSION
-} = require('./recovery-store-state-aware');
+const unipin =
+  require(
+    './unipin'
+  );
 
-const {
-  makeGenericAdapters
-} = require('./generic-json');
+const lapakgaming =
+  require(
+    './lapakgaming'
+  );
 
-const {
-  createUniversalAdapter
-} = require('./universal-page');
-
-const {
-  createPublicApiAdapter,
-  isPublicApiConfigured
-} = require('./public-api');
-
-const {
-  createMultiStrategyAdapter
-} = require('./multi-strategy');
-
-const {
-  listStores
-} = require('../config/stores');
-
-const ADAPTER_REGISTRY_VERSION =
-  '2026-08-13-final-four-v1';
-
-function optionalAdapter(path) {
-  try {
-    return require(path);
-  } catch (error) {
-    if (
-      error?.code === 'MODULE_NOT_FOUND' &&
-      String(error?.message || '')
-        .includes(`'${path}'`)
-    ) {
-      return null;
-    }
-
-    throw error;
-  }
-}
-
-/*
- * ============================================================
- * CUSTOM ADAPTERS YANG SUDAH BERHASIL
- * ============================================================
- *
- * Jangan mengubah toko yang saat ini sudah berhasil.
- */
-const customAdapters = {
-  gigames:
-    optionalAdapter('./gigames'),
-
-  'kios-game-indonesia':
-    optionalAdapter(
-      './kios-game-indonesia'
-    ),
-
-  casatopup:
-    optionalAdapter('./casatopup'),
-
-  topupgamez:
-    optionalAdapter('./topupgamez'),
-
-  bxystore:
-    optionalAdapter('./bxystore')
-};
-
-const existingCustom =
-  Object.fromEntries(
-    Object.entries(
-      customAdapters
-    ).filter(
-      (
-        [
-          ,
-          adapter
-        ]
-      ) =>
-        Boolean(adapter)
-    )
+const duniagames =
+  require(
+    './duniagames'
   );
 
 /*
  * ============================================================
- * DEDICATED REGISTRY
+ * DEDICATED ADAPTERS — PATCH KHUSUS
  * ============================================================
+ *
+ * Hanya menambahkan dua toko yang masih bermasalah.
+ * Adapter toko lain tidak diubah.
  */
+const topupdeh =
+  require(
+    './topupdeh'
+  );
+
+const bxystore =
+  require(
+    './bxystore'
+  );
+
+const {
+  makeGenericAdapters
+} = require(
+  './generic-json'
+);
+
+const {
+  createUniversalAdapter
+} = require(
+  './universal-page'
+);
+
+const {
+  createPublicApiAdapter,
+  isPublicApiConfigured
+} = require(
+  './public-api'
+);
+
+const {
+  createMultiStrategyAdapter
+} = require(
+  './multi-strategy'
+);
+
+const {
+  listStores
+} = require(
+  '../config/stores'
+);
+
+const ADAPTER_REGISTRY_VERSION =
+  '2026-08-13-topupdeh-bxy-v1';
+
 const DEDICATED = {
-  /*
-   * Existing stable adapters.
-   */
+  codashop,
+  unipin,
   lapakgaming,
   duniagames,
 
   /*
-   * Codashop dan UniPin:
-   *
-   * adapter lama tetap dicoba terlebih dahulu.
-   * Jika tidak cocok dengan game/halaman,
-   * state-aware recovery mengambil alih.
+   * Dua adapter ini harus masuk strategy "dedicated".
+   * Sebelumnya file-nya ada, tetapi registry main belum
+   * mendaftarkannya.
    */
-  codashop:
-    createLegacyThenStateAwareRecoveryAdapter(
-      codashopLegacy,
-      'codashop'
-    ),
-
-  unipin:
-    createLegacyThenStateAwareRecoveryAdapter(
-      unipinLegacy,
-      'unipin'
-    ),
-
-  /*
-   * Existing custom parsers.
-   */
-  ...existingCustom,
-
-  /*
-   * Recovery adapters.
-   */
-  'gopay-games':
-    stateAwareRecoveryAdapters[
-      'gopay-games'
-    ],
-
-  'ggwp-topup':
-    stateAwareRecoveryAdapters[
-      'ggwp-topup'
-    ],
-
-  'oura-store':
-    stateAwareRecoveryAdapters[
-      'oura-store'
-    ],
-
-  topupgamestore:
-    stateAwareRecoveryAdapters
-      .topupgamestore,
-
-  'topup-id':
-    stateAwareRecoveryAdapters[
-      'topup-id'
-    ],
-
-  topupdeh:
-    stateAwareRecoveryAdapters
-      .topupdeh,
-
-  seagm:
-    stateAwareRecoveryAdapters
-      .seagm,
-
-  sontopup:
-    stateAwareRecoveryAdapters
-      .sontopup,
-
-  yoggstore:
-    stateAwareRecoveryAdapters
-      .yoggstore,
-
-  gamestorecan:
-    stateAwareRecoveryAdapters
-      .gamestorecan
+  topupdeh,
+  bxystore
 };
 
 function normalizeStrategyList(
@@ -198,7 +109,8 @@ function normalizeStrategyList(
     .map(
       (value) =>
         String(
-          value || ''
+          value ||
+          ''
         )
           .trim()
           .toLowerCase()
@@ -207,13 +119,19 @@ function normalizeStrategyList(
     .filter(
       (value) => {
         if (
-          seen.has(value) ||
-          !available[value]
+          seen.has(
+            value
+          ) ||
+          !available[
+            value
+          ]
         ) {
           return false;
         }
 
-        seen.add(value);
+        seen.add(
+          value
+        );
 
         return true;
       }
@@ -223,24 +141,31 @@ function normalizeStrategyList(
 function buildStoreAdapter(
   store
 ) {
-  const available = {};
+  const available =
+    {};
 
   /*
+   * ========================================================
    * PUBLIC API
+   * ========================================================
    */
   if (
     isPublicApiConfigured(
       store
     )
   ) {
-    available['public-api'] =
+    available[
+      'public-api'
+    ] =
       createPublicApiAdapter(
         store
       );
   }
 
   /*
-   * DEDICATED / STATE-AWARE
+   * ========================================================
+   * DEDICATED
+   * ========================================================
    */
   if (
     DEDICATED[
@@ -254,17 +179,14 @@ function buildStoreAdapter(
   }
 
   /*
+   * ========================================================
    * UNIVERSAL
+   * ========================================================
    *
-   * Tetap tersedia untuk parser failure biasa.
+   * Tetap menjadi fallback untuk parser failure biasa.
    *
-   * Tetapi terminal provider state akan dihentikan
-   * oleh multi-strategy sebelum masuk universal:
-   *
-   * REGION_UNAVAILABLE
-   * DYNAMIC_PRICE_REQUIRED
-   * PRODUCT_UNAVAILABLE
-   * MAINTENANCE
+   * DYNAMIC_PRICE_REQUIRED akan dihentikan oleh
+   * multi-strategy.js sebelum masuk universal.
    */
   if (
     store.disableUniversal !==
@@ -276,19 +198,27 @@ function buildStoreAdapter(
       );
   }
 
-  const strategies =
+  const strategyIds =
     normalizeStrategyList(
       store,
       available
-    ).map(
+    );
+
+  const strategies =
+    strategyIds.map(
       (id) => ({
         id,
 
         adapter:
-          available[id]
+          available[
+            id
+          ]
       })
     );
 
+  /*
+   * Compatibility guard.
+   */
   if (
     !strategies.length &&
     store.disableUniversal !==
@@ -311,17 +241,17 @@ function buildStoreAdapter(
       strategies
     );
 
+  /*
+   * Deployment marker.
+   */
   adapter.adapterRegistryVersion =
     ADAPTER_REGISTRY_VERSION;
-
-  adapter.stateAwareRecoveryVersion =
-    STATE_AWARE_RECOVERY_VERSION;
 
   return adapter;
 }
 
 function buildRegistryAdapters() {
-  const enabled =
+  const publicAdaptersEnabled =
     String(
       process.env
         .ENABLE_PUBLIC_PAGE_ADAPTERS ||
@@ -330,7 +260,9 @@ function buildRegistryAdapters() {
       .toLowerCase() !==
     'false';
 
-  if (!enabled) {
+  if (
+    !publicAdaptersEnabled
+  ) {
     return [];
   }
 
@@ -367,20 +299,30 @@ function selectAdapters(
   const safeOffset =
     Math.max(
       0,
-      Number(offset) || 0
+
+      Number(
+        offset
+      ) ||
+      0
     );
 
   const safeLimit =
     Math.max(
       1,
+
       Math.min(
         20,
-        Number(limit) || 8
+
+        Number(
+          limit
+        ) ||
+        8
       )
     );
 
   return adapters.slice(
     safeOffset,
+
     safeOffset +
       safeLimit
   );
@@ -417,7 +359,7 @@ function getStoreAdapterCount() {
 
 module.exports = {
   ADAPTER_REGISTRY_VERSION,
-  STATE_AWARE_RECOVERY_VERSION,
+
   getStoreAdapters,
   getStoreAdapterCount,
   buildRegistryAdapters,
