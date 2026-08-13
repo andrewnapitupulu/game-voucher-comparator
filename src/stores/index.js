@@ -1,11 +1,11 @@
 'use strict';
 
-const codashop =
+const codashopLegacy =
   require(
     './codashop'
   );
 
-const unipin =
+const unipinLegacy =
   require(
     './unipin'
   );
@@ -20,23 +20,15 @@ const duniagames =
     './duniagames'
   );
 
-/*
- * ============================================================
- * DEDICATED ADAPTERS — PATCH KHUSUS
- * ============================================================
- *
- * Hanya menambahkan dua toko yang masih bermasalah.
- * Adapter toko lain tidak diubah.
- */
-const topupdeh =
-  require(
-    './topupdeh'
-  );
+const {
+  stateAwareRecoveryAdapters,
 
-const bxystore =
-  require(
-    './bxystore'
-  );
+  createLegacyThenStateAwareRecoveryAdapter,
+
+  STATE_AWARE_RECOVERY_VERSION
+} = require(
+  './recovery-store-state-aware'
+);
 
 const {
   makeGenericAdapters
@@ -70,23 +62,491 @@ const {
 );
 
 const ADAPTER_REGISTRY_VERSION =
-  '2026-08-13-topupdeh-bxy-v1';
+  '2026-08-13-cumulative-registry-v1';
 
+/*
+ * ============================================================
+ * OPTIONAL CUSTOM ADAPTER
+ * ============================================================
+ *
+ * Beberapa adapter dibuat pada iterasi sebelumnya.
+ *
+ * Kita tidak ingin server crash hanya karena salah satu file
+ * custom belum ada pada branch tertentu.
+ *
+ * Tetapi jika file tersebut tersedia, adapter tersebut harus
+ * tetap dipakai.
+ */
+function optionalAdapter(
+  path
+) {
+  try {
+    return require(
+      path
+    );
+  } catch (
+    error
+  ) {
+    if (
+      error?.code ===
+        'MODULE_NOT_FOUND' &&
+      String(
+        error?.message ||
+        ''
+      ).includes(
+        `'${path}'`
+      )
+    ) {
+      return null;
+    }
+
+    throw error;
+  }
+}
+
+/*
+ * ============================================================
+ * CUSTOM / DEDICATED ADAPTERS YANG SUDAH PERNAH DIBUAT
+ * ============================================================
+ */
+const gigames =
+  optionalAdapter(
+    './gigames'
+  );
+
+const ouraStore =
+  optionalAdapter(
+    './oura-store'
+  );
+
+const seagm =
+  optionalAdapter(
+    './seagm'
+  );
+
+const kiosGameIndonesia =
+  optionalAdapter(
+    './kios-game-indonesia'
+  );
+
+const casatopup =
+  optionalAdapter(
+    './casatopup'
+  );
+
+const bxystore =
+  optionalAdapter(
+    './bxystore'
+  );
+
+const topupdeh =
+  optionalAdapter(
+    './topupdeh'
+  );
+
+/*
+ * Jika di masa depan file topupgamez.js tersedia,
+ * registry otomatis dapat memakainya.
+ *
+ * Saat file belum ada, toko tetap menggunakan universal
+ * seperti sebelumnya.
+ */
+const topupgamez =
+  optionalAdapter(
+    './topupgamez'
+  );
+
+/*
+ * ============================================================
+ * RECOVERABLE CUSTOM ADAPTER ERRORS
+ * ============================================================
+ *
+ * Jika custom adapter gagal karena struktur/route, kita boleh
+ * mencoba recovery adapter.
+ *
+ * Jangan fallback untuk:
+ *
+ * ACCESS_BLOCKED
+ * RATE_LIMITED
+ * NETWORK ERROR
+ * TIMEOUT
+ *
+ * karena request tambahan justru dapat memperburuk kondisi.
+ */
+const CUSTOM_FALLBACK_CODES =
+  new Set([
+    'NOT_CONFIGURED',
+    'PARSER_FAILED',
+    'PAGE_NOT_VERIFIED',
+    'PAGE_NOT_FOUND'
+  ]);
+
+function normalizeCode(
+  error
+) {
+  return String(
+    error?.code ||
+    ''
+  )
+    .trim()
+    .toUpperCase();
+}
+
+/*
+ * ============================================================
+ * PRIMARY CUSTOM → RECOVERY
+ * ============================================================
+ *
+ * Digunakan untuk toko yang:
+ *
+ * 1. sudah memiliki parser dedicated khusus, DAN
+ * 2. juga memiliki recovery adapter.
+ *
+ * Contoh:
+ *
+ * Oura Store
+ * TopUpDeh
+ * SEAGM
+ *
+ * Custom parser selalu dicoba dahulu.
+ *
+ * Recovery hanya dipakai jika custom parser mengalami error
+ * yang aman untuk di-recover.
+ */
+function createPrimaryThenRecoveryAdapter(
+  primaryAdapter,
+  recoveryAdapter,
+  {
+    id,
+    name
+  }
+) {
+  if (
+    !primaryAdapter
+  ) {
+    return recoveryAdapter ||
+      null;
+  }
+
+  if (
+    !recoveryAdapter
+  ) {
+    return primaryAdapter;
+  }
+
+  return {
+    id,
+
+    name,
+
+    strategy:
+      'dedicated-with-recovery',
+
+    async fetchOffers(
+      game,
+      options = {}
+    ) {
+      let primaryError =
+        null;
+
+      try {
+        const offers =
+          await primaryAdapter
+            .fetchOffers(
+              game,
+              options
+            );
+
+        /*
+         * Empty array tidak dianggap final success.
+         *
+         * Kalau primary tidak menemukan apa pun,
+         * recovery tetap diberi kesempatan.
+         */
+        if (
+          Array.isArray(
+            offers
+          ) &&
+          offers.length
+        ) {
+          return offers;
+        }
+      } catch (
+        error
+      ) {
+        primaryError =
+          error;
+
+        /*
+         * Terminal provider state dari custom adapter
+         * harus dipertahankan.
+         */
+        if (
+          [
+            'REGION_UNAVAILABLE',
+            'DYNAMIC_PRICE_REQUIRED',
+            'PRODUCT_UNAVAILABLE',
+            'MAINTENANCE'
+          ].includes(
+            normalizeCode(
+              error
+            )
+          )
+        ) {
+          throw error;
+        }
+
+        /*
+         * Infrastructure/access error juga tidak boleh
+         * di-bypass dengan request recovery tambahan.
+         */
+        if (
+          !CUSTOM_FALLBACK_CODES
+            .has(
+              normalizeCode(
+                error
+              )
+            )
+        ) {
+          throw error;
+        }
+      }
+
+      try {
+        const recoveredOffers =
+          await recoveryAdapter
+            .fetchOffers(
+              game,
+              options
+            );
+
+        if (
+          Array.isArray(
+            recoveredOffers
+          ) &&
+          recoveredOffers.length
+        ) {
+          return recoveredOffers;
+        }
+
+        /*
+         * Bila recovery mengembalikan [] tanpa exception,
+         * buat PARSER_FAILED agar universal fallback masih
+         * mendapat kesempatan.
+         */
+        const error =
+          new Error(
+            `${name} recovery tidak menghasilkan offer`
+          );
+
+        error.code =
+          'PARSER_FAILED';
+
+        error.parserReason =
+          'RECOVERY_RETURNED_NO_OFFERS';
+
+        if (
+          primaryError
+        ) {
+          error.primaryAdapterError = {
+            code:
+              primaryError?.code ||
+              null,
+
+            parserReason:
+              primaryError
+                ?.parserReason ||
+              null
+          };
+        }
+
+        throw error;
+      } catch (
+        recoveryError
+      ) {
+        if (
+          primaryError
+        ) {
+          recoveryError
+            .primaryAdapterError = {
+              code:
+                primaryError?.code ||
+                null,
+
+              parserReason:
+                primaryError
+                  ?.parserReason ||
+                null
+            };
+        }
+
+        throw recoveryError;
+      }
+    }
+  };
+}
+
+/*
+ * ============================================================
+ * FINAL CUMULATIVE DEDICATED REGISTRY
+ * ============================================================
+ *
+ * PENTING:
+ *
+ * Registry ini bersifat kumulatif.
+ *
+ * Jangan mengganti registry ini dengan patch toko yang hanya
+ * memuat 1-2 adapter, karena itu yang sebelumnya menyebabkan
+ * banyak toko kembali PARSER_FAILED.
+ */
 const DEDICATED = {
-  codashop,
-  unipin,
+  /*
+   * ========================================================
+   * LEGACY STABLE
+   * ========================================================
+   */
   lapakgaming,
+
   duniagames,
 
   /*
-   * Dua adapter ini harus masuk strategy "dedicated".
-   * Sebelumnya file-nya ada, tetapi registry main belum
-   * mendaftarkannya.
+   * ========================================================
+   * LEGACY → STATE-AWARE RECOVERY
+   * ========================================================
+   *
+   * Codashop dan UniPin tetap menggunakan dedicated legacy
+   * terlebih dahulu.
+   *
+   * Jika legacy gagal pada route/game tertentu, barulah
+   * state-aware recovery dipakai.
    */
-  topupdeh,
-  bxystore
+  codashop:
+    createLegacyThenStateAwareRecoveryAdapter(
+      codashopLegacy,
+      'codashop'
+    ),
+
+  unipin:
+    createLegacyThenStateAwareRecoveryAdapter(
+      unipinLegacy,
+      'unipin'
+    ),
+
+  /*
+   * ========================================================
+   * CUSTOM DEDICATED
+   * ========================================================
+   */
+  gigames,
+
+  'kios-game-indonesia':
+    kiosGameIndonesia,
+
+  casatopup,
+
+  bxystore,
+
+  topupgamez,
+
+  /*
+   * ========================================================
+   * CUSTOM DEDICATED → RECOVERY
+   * ========================================================
+   */
+  'oura-store':
+    createPrimaryThenRecoveryAdapter(
+      ouraStore,
+
+      stateAwareRecoveryAdapters[
+        'oura-store'
+      ],
+
+      {
+        id:
+          'oura-store',
+
+        name:
+          'Oura Store'
+      }
+    ),
+
+  topupdeh:
+    createPrimaryThenRecoveryAdapter(
+      topupdeh,
+
+      stateAwareRecoveryAdapters
+        .topupdeh,
+
+      {
+        id:
+          'topupdeh',
+
+        name:
+          'TopUpDeh'
+      }
+    ),
+
+  seagm:
+    createPrimaryThenRecoveryAdapter(
+      seagm,
+
+      stateAwareRecoveryAdapters
+        .seagm,
+
+      {
+        id:
+          'seagm',
+
+        name:
+          'SEAGM'
+      }
+    ),
+
+  /*
+   * ========================================================
+   * RECOVERY / STATE-AWARE
+   * ========================================================
+   *
+   * Store berikut sebelumnya kembali jatuh ke universal
+   * parser karena tidak didaftarkan pada index.js.
+   */
+  'gopay-games':
+    stateAwareRecoveryAdapters[
+      'gopay-games'
+    ],
+
+  'ggwp-topup':
+    stateAwareRecoveryAdapters[
+      'ggwp-topup'
+    ],
+
+  topupgamestore:
+    stateAwareRecoveryAdapters
+      .topupgamestore,
+
+  'topup-id':
+    stateAwareRecoveryAdapters[
+      'topup-id'
+    ],
+
+  sontopup:
+    stateAwareRecoveryAdapters
+      .sontopup,
+
+  yoggstore:
+    stateAwareRecoveryAdapters
+      .yoggstore,
+
+  gamestorecan:
+    stateAwareRecoveryAdapters
+      .gamestorecan
 };
 
+/*
+ * ============================================================
+ * STRATEGY NORMALIZATION
+ * ============================================================
+ */
 function normalizeStrategyList(
   store,
   available
@@ -105,17 +565,56 @@ function normalizeStrategyList(
   const seen =
     new Set();
 
-  return requested
-    .map(
-      (value) =>
-        String(
-          value ||
-          ''
-        )
-          .trim()
-          .toLowerCase()
+  const normalized =
+    requested
+      .map(
+        (value) =>
+          String(
+            value ||
+            ''
+          )
+            .trim()
+            .toLowerCase()
+      )
+      .filter(
+        Boolean
+      );
+
+  /*
+   * Jika store mempunyai dedicated adapter tetapi konfigurasi
+   * accessStrategies lama tidak mencantumkan "dedicated",
+   * tambahkan dedicated sebelum universal.
+   *
+   * Ini membuat registry custom/recovery benar-benar digunakan.
+   */
+  if (
+    available.dedicated &&
+    !normalized.includes(
+      'dedicated'
     )
-    .filter(Boolean)
+  ) {
+    const universalIndex =
+      normalized.indexOf(
+        'universal'
+      );
+
+    if (
+      universalIndex >=
+      0
+    ) {
+      normalized.splice(
+        universalIndex,
+        0,
+        'dedicated'
+      );
+    } else {
+      normalized.push(
+        'dedicated'
+      );
+    }
+  }
+
+  return normalized
     .filter(
       (value) => {
         if (
@@ -138,6 +637,11 @@ function normalizeStrategyList(
     );
 }
 
+/*
+ * ============================================================
+ * BUILD STORE ADAPTER
+ * ============================================================
+ */
 function buildStoreAdapter(
   store
 ) {
@@ -145,9 +649,7 @@ function buildStoreAdapter(
     {};
 
   /*
-   * ========================================================
    * PUBLIC API
-   * ========================================================
    */
   if (
     isPublicApiConfigured(
@@ -163,9 +665,7 @@ function buildStoreAdapter(
   }
 
   /*
-   * ========================================================
    * DEDICATED
-   * ========================================================
    */
   if (
     DEDICATED[
@@ -179,14 +679,10 @@ function buildStoreAdapter(
   }
 
   /*
-   * ========================================================
-   * UNIVERSAL
-   * ========================================================
+   * UNIVERSAL FALLBACK
    *
-   * Tetap menjadi fallback untuk parser failure biasa.
-   *
-   * DYNAMIC_PRICE_REQUIRED akan dihentikan oleh
-   * multi-strategy.js sebelum masuk universal.
+   * Tetap aktif agar toko tanpa dedicated/recovery masih
+   * berjalan seperti sebelumnya.
    */
   if (
     store.disableUniversal !==
@@ -217,7 +713,10 @@ function buildStoreAdapter(
     );
 
   /*
-   * Compatibility guard.
+   * Compatibility guard:
+   *
+   * Jangan membuat toko hilang hanya karena configuration
+   * strategy tidak cocok.
    */
   if (
     !strategies.length &&
@@ -242,16 +741,26 @@ function buildStoreAdapter(
     );
 
   /*
-   * Deployment marker.
+   * Deployment markers.
    */
-  adapter.adapterRegistryVersion =
+  adapter
+    .adapterRegistryVersion =
     ADAPTER_REGISTRY_VERSION;
+
+  adapter
+    .stateAwareRecoveryVersion =
+    STATE_AWARE_RECOVERY_VERSION;
 
   return adapter;
 }
 
+/*
+ * ============================================================
+ * REGISTRY
+ * ============================================================
+ */
 function buildRegistryAdapters() {
-  const publicAdaptersEnabled =
+  const enabled =
     String(
       process.env
         .ENABLE_PUBLIC_PAGE_ADAPTERS ||
@@ -261,7 +770,7 @@ function buildRegistryAdapters() {
     'false';
 
   if (
-    !publicAdaptersEnabled
+    !enabled
   ) {
     return [];
   }
@@ -272,11 +781,19 @@ function buildRegistryAdapters() {
     );
 }
 
+/*
+ * ============================================================
+ * SELECTION / PAGINATION
+ * ============================================================
+ */
 function selectAdapters(
   adapters,
   {
     offset = 0,
-    limit = adapters.length,
+
+    limit =
+      adapters.length,
+
     storeIds = []
   } = {}
 ) {
@@ -328,6 +845,11 @@ function selectAdapters(
   );
 }
 
+/*
+ * ============================================================
+ * PUBLIC API
+ * ============================================================
+ */
 function getStoreAdapters(
   options = {}
 ) {
@@ -342,11 +864,14 @@ function getStoreAdapters(
 
   const includeFeeds =
     !options.offset &&
-    !options.storeIds?.length;
+    !options
+      .storeIds
+      ?.length;
 
   return includeFeeds
     ? [
         ...selectedRegistry,
+
         ...makeGenericAdapters()
       ]
     : selectedRegistry;
@@ -360,8 +885,13 @@ function getStoreAdapterCount() {
 module.exports = {
   ADAPTER_REGISTRY_VERSION,
 
+  STATE_AWARE_RECOVERY_VERSION,
+
   getStoreAdapters,
+
   getStoreAdapterCount,
+
   buildRegistryAdapters,
+
   buildStoreAdapter
 };
