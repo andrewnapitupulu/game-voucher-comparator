@@ -21,14 +21,13 @@ const duniagames =
   );
 
 const {
-  recoveryAdapters,
+  stateAwareRecoveryAdapters,
 
-  createLegacyThenRecoveryAdapter,
+  createLegacyThenStateAwareRecoveryAdapter,
 
-  ADAPTER_VERSION:
-    RECOVERY_STORE_ADAPTER_VERSION
+  STATE_AWARE_RECOVERY_VERSION
 } = require(
-  './recovery-store-adapters'
+  './recovery-store-state-aware'
 );
 
 const {
@@ -63,18 +62,8 @@ const {
 );
 
 const ADAPTER_REGISTRY_VERSION =
-  '2026-08-13-registry-stable-v1';
+  '2026-08-13-registry-state-aware-v1';
 
-/*
- * ============================================================
- * OPTIONAL CUSTOM ADAPTERS
- * ============================================================
- *
- * Beberapa adapter berasal dari patch sebelumnya.
- *
- * Dibuat optional supaya index.js tidak membuat server crash
- * bila salah satu file belum tersedia pada branch tertentu.
- */
 function optionalAdapter(
   path
 ) {
@@ -102,7 +91,11 @@ function optionalAdapter(
   }
 }
 
-const optionalCustomAdapters = {
+/*
+ * Adapter custom dari patch sebelumnya tetap
+ * dipertahankan jika file-nya tersedia.
+ */
+const customAdapters = {
   gigames:
     optionalAdapter(
       './gigames'
@@ -132,7 +125,7 @@ const optionalCustomAdapters = {
 const existingCustom =
   Object.fromEntries(
     Object.entries(
-      optionalCustomAdapters
+      customAdapters
     )
       .filter(
         (
@@ -151,21 +144,6 @@ const existingCustom =
  * ============================================================
  * DEDICATED REGISTRY
  * ============================================================
- *
- * Prinsip versi ini:
- *
- * 1. Lapakgaming dan Dunia Games tidak diubah.
- *
- * 2. Codashop / UniPin:
- *    legacy dahulu → strict recovery jika legacy tidak
- *    configured / parser failed.
- *
- * 3. Adapter custom yang sebelumnya berhasil tetap dijaga.
- *
- * 4. Sebelas toko yang sekarang bermasalah benar-benar
- *    diarahkan ke recovery-store-adapters.
- *
- * 5. Universal parser tetap menjadi fallback.
  */
 const DEDICATED = {
   lapakgaming,
@@ -173,70 +151,74 @@ const DEDICATED = {
   duniagames,
 
   /*
-   * Legacy + strict recovery.
+   * Codashop / UniPin:
+   *
+   * dedicated lama dahulu, kemudian state-aware
+   * recovery jika legacy tidak berhasil.
    */
   codashop:
-    createLegacyThenRecoveryAdapter(
+    createLegacyThenStateAwareRecoveryAdapter(
       codashopLegacy,
-      recoveryAdapters
-        .codashop
+      'codashop'
     ),
 
   unipin:
-    createLegacyThenRecoveryAdapter(
+    createLegacyThenStateAwareRecoveryAdapter(
       unipinLegacy,
-      recoveryAdapters
-        .unipin
+      'unipin'
     ),
 
   /*
-   * Pertahankan custom adapter lama yang tersedia.
+   * Pertahankan custom adapters yang sekarang
+   * sudah bekerja.
    */
   ...existingCustom,
 
   /*
-   * Recovery adapters diletakkan PALING AKHIR.
-   *
-   * Dengan begitu store-store di bawah tidak tertimpa
-   * registry lama.
+   * Recovery adapters.
    */
   'gopay-games':
-    recoveryAdapters[
+    stateAwareRecoveryAdapters[
       'gopay-games'
     ],
 
   'ggwp-topup':
-    recoveryAdapters[
+    stateAwareRecoveryAdapters[
       'ggwp-topup'
     ],
 
   'oura-store':
-    recoveryAdapters[
+    stateAwareRecoveryAdapters[
       'oura-store'
     ],
 
   topupgamestore:
-    recoveryAdapters
+    stateAwareRecoveryAdapters
       .topupgamestore,
 
+  'topup-id':
+    stateAwareRecoveryAdapters[
+      'topup-id'
+    ],
+
   topupdeh:
-    recoveryAdapters
+    stateAwareRecoveryAdapters
       .topupdeh,
 
   seagm:
-    recoveryAdapters
+    stateAwareRecoveryAdapters
       .seagm,
 
   sontopup:
-    recoveryAdapters
+    stateAwareRecoveryAdapters
       .sontopup,
 
   yoggstore:
-    recoveryAdapters
+    stateAwareRecoveryAdapters
       .yoggstore,
 
   gamestorecan:
-    recoveryAdapters
+    stateAwareRecoveryAdapters
       .gamestorecan
 };
 
@@ -246,11 +228,9 @@ function normalizeStrategyList(
 ) {
   const requested =
     Array.isArray(
-      store
-        .accessStrategies
+      store.accessStrategies
     )
-      ? store
-          .accessStrategies
+      ? store.accessStrategies
       : [
           'public-api',
           'dedicated',
@@ -301,11 +281,6 @@ function buildStoreAdapter(
   const available =
     {};
 
-  /*
-   * ========================================================
-   * PUBLIC API
-   * ========================================================
-   */
   if (
     isPublicApiConfigured(
       store
@@ -319,11 +294,6 @@ function buildStoreAdapter(
       );
   }
 
-  /*
-   * ========================================================
-   * DEDICATED
-   * ========================================================
-   */
   if (
     DEDICATED[
       store.id
@@ -336,19 +306,11 @@ function buildStoreAdapter(
   }
 
   /*
-   * ========================================================
-   * UNIVERSAL FALLBACK
-   * ========================================================
-   *
-   * Sengaja tetap aktif.
-   *
-   * Kita TIDAK menerapkan strict-only secara global lagi
-   * karena perubahan global sebelumnya membuat provider yang
-   * sebenarnya sudah stabil ikut regression.
+   * Universal tetap fallback supaya toko yang
+   * sudah stabil tidak ikut regression.
    */
   if (
-    store
-      .disableUniversal !==
+    store.disableUniversal !==
     true
   ) {
     available.universal =
@@ -373,13 +335,9 @@ function buildStoreAdapter(
         })
       );
 
-  /*
-   * Compatibility guard.
-   */
   if (
     !strategies.length &&
-    store
-      .disableUniversal !==
+    store.disableUniversal !==
     true
   ) {
     strategies.push({
@@ -399,17 +357,13 @@ function buildStoreAdapter(
       strategies
     );
 
-  /*
-   * Marker supaya kita bisa memastikan deployment
-   * benar-benar sudah memakai registry ini.
-   */
   adapter
     .adapterRegistryVersion =
     ADAPTER_REGISTRY_VERSION;
 
   adapter
-    .recoveryStoreAdapterVersion =
-    RECOVERY_STORE_ADAPTER_VERSION;
+    .stateAwareRecoveryVersion =
+    STATE_AWARE_RECOVERY_VERSION;
 
   return adapter;
 }
@@ -440,10 +394,7 @@ function selectAdapters(
   adapters,
   {
     offset = 0,
-
-    limit =
-      adapters.length,
-
+    limit = adapters.length,
     storeIds = []
   } = {}
 ) {
@@ -509,9 +460,7 @@ function getStoreAdapters(
 
   const includeFeeds =
     !options.offset &&
-    !options
-      .storeIds
-      ?.length;
+    !options.storeIds?.length;
 
   return includeFeeds
     ? [
@@ -530,7 +479,7 @@ function getStoreAdapterCount() {
 module.exports = {
   ADAPTER_REGISTRY_VERSION,
 
-  RECOVERY_STORE_ADAPTER_VERSION,
+  STATE_AWARE_RECOVERY_VERSION,
 
   getStoreAdapters,
 
