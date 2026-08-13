@@ -1,51 +1,102 @@
 'use strict';
 
-const codashop = require('./codashop');
-const unipin = require('./unipin');
-const lapakgaming = require('./lapakgaming');
-const duniagames = require('./duniagames');
+const codashop =
+  require(
+    './codashop'
+  );
 
-const gigames = require('./gigames');
-const ouraStore = require('./oura-store');
-const kiosGameIndonesia = require('./kios-game-indonesia');
-const topupdeh = require('./topupdeh');
+const unipin =
+  require(
+    './unipin'
+  );
 
-const { makeGenericAdapters } = require('./generic-json');
-const { createUniversalAdapter } = require('./universal-page');
+const lapakgaming =
+  require(
+    './lapakgaming'
+  );
+
+const duniagames =
+  require(
+    './duniagames'
+  );
+
+const gigames =
+  require(
+    './gigames'
+  );
+
+const ouraStore =
+  require(
+    './oura-store'
+  );
+
+const seagm =
+  require(
+    './seagm'
+  );
+
+const kiosGameIndonesia =
+  require(
+    './kios-game-indonesia'
+  );
+
+const topupdeh =
+  require(
+    './topupdeh'
+  );
+
+const {
+  makeGenericAdapters
+} = require(
+  './generic-json'
+);
+
+const {
+  createUniversalAdapter
+} = require(
+  './universal-page'
+);
 
 const {
   createPublicApiAdapter,
   isPublicApiConfigured
-} = require('./public-api');
+} = require(
+  './public-api'
+);
 
 const {
   createMultiStrategyAdapter
-} = require('./multi-strategy');
+} = require(
+  './multi-strategy'
+);
 
 const {
   listStores
-} = require('../config/stores');
+} = require(
+  '../config/stores'
+);
 
 const ADAPTER_REGISTRY_VERSION =
-  '2026-08-12-dedicated-v3';
+  '2026-08-13-dedicated-v4';
 
-/*
- * ============================================================
- * DEDICATED ADAPTER REGISTRY
- * ============================================================
- *
- * Jangan menghapus adapter yang sebelumnya sudah berhasil.
- */
 const DEDICATED = {
   codashop,
+
   unipin,
+
   lapakgaming,
+
   duniagames,
 
+  /*
+   * Custom dedicated adapters.
+   */
   gigames,
 
   'oura-store':
     ouraStore,
+
+  seagm,
 
   'kios-game-indonesia':
     kiosGameIndonesia,
@@ -81,7 +132,9 @@ function normalizeStrategyList(
           .trim()
           .toLowerCase()
     )
-    .filter(Boolean)
+    .filter(
+      Boolean
+    )
     .filter(
       (value) => {
         if (
@@ -111,9 +164,7 @@ function buildStoreAdapter(
     {};
 
   /*
-   * ========================================================
    * PUBLIC API
-   * ========================================================
    */
   if (
     isPublicApiConfigured(
@@ -129,9 +180,7 @@ function buildStoreAdapter(
   }
 
   /*
-   * ========================================================
    * DEDICATED
-   * ========================================================
    */
   if (
     DEDICATED[
@@ -145,9 +194,7 @@ function buildStoreAdapter(
   }
 
   /*
-   * ========================================================
-   * UNIVERSAL
-   * ========================================================
+   * UNIVERSAL FALLBACK
    */
   if (
     store.disableUniversal !==
@@ -159,23 +206,21 @@ function buildStoreAdapter(
       );
   }
 
-  const strategyIds =
+  const strategies =
     normalizeStrategyList(
       store,
       available
-    );
+    )
+      .map(
+        (id) => ({
+          id,
 
-  const strategies =
-    strategyIds.map(
-      (id) => ({
-        id,
-
-        adapter:
-          available[
-            id
-          ]
-      })
-    );
+          adapter:
+            available[
+              id
+            ]
+        })
+      );
 
   /*
    * Compatibility guard.
@@ -183,7 +228,7 @@ function buildStoreAdapter(
   if (
     !strategies.length &&
     store.disableUniversal !==
-      true
+    true
   ) {
     strategies.push({
       id:
@@ -202,10 +247,8 @@ function buildStoreAdapter(
       strategies
     );
 
-  /*
-   * Marker deployment.
-   */
-  adapter.adapterRegistryVersion =
+  adapter
+    .adapterRegistryVersion =
     ADAPTER_REGISTRY_VERSION;
 
   return adapter;
@@ -260,6 +303,7 @@ function selectAdapters(
   const safeOffset =
     Math.max(
       0,
+
       Number(
         offset
       ) ||
@@ -307,6 +351,7 @@ function getStoreAdapters(
   return includeFeeds
     ? [
         ...selectedRegistry,
+
         ...makeGenericAdapters()
       ]
     : selectedRegistry;
