@@ -1,11 +1,11 @@
 'use strict';
 
-const codashop =
+const codashopLegacy =
   require(
     './codashop'
   );
 
-const unipin =
+const unipinLegacy =
   require(
     './unipin'
   );
@@ -20,88 +20,16 @@ const duniagames =
     './duniagames'
   );
 
-function optionalAdapter(
-  path
-) {
-  try {
-    return require(
-      path
-    );
-  } catch (
-    error
-  ) {
-    /*
-     * Adapter dari patch sebelumnya dibuat optional.
-     *
-     * Jadi kalau branch tertentu belum punya satu file
-     * dedicated lama, server tidak langsung crash.
-     */
-    if (
-      error?.code ===
-        'MODULE_NOT_FOUND' &&
-      String(
-        error.message ||
-        ''
-      ).includes(
-        `'${path}'`
-      )
-    ) {
-      return null;
-    }
+const {
+  recoveryAdapters,
 
-    throw error;
-  }
-}
+  createLegacyThenRecoveryAdapter,
 
-/*
- * ============================================================
- * ADAPTERS DARI PATCH SEBELUMNYA
- * ============================================================
- */
-const gigames =
-  optionalAdapter(
-    './gigames'
-  );
-
-const ouraStore =
-  optionalAdapter(
-    './oura-store'
-  );
-
-const seagm =
-  optionalAdapter(
-    './seagm'
-  );
-
-const kiosGameIndonesia =
-  require(
-    './kios-game-indonesia'
-  );
-
-const topupdeh =
-  optionalAdapter(
-    './topupdeh'
-  );
-
-/*
- * ============================================================
- * STRICT ADAPTERS
- * ============================================================
- */
-const casatopup =
-  require(
-    './casatopup'
-  );
-
-const topupgamez =
-  require(
-    './topupgamez'
-  );
-
-const bxystore =
-  require(
-    './bxystore'
-  );
+  ADAPTER_VERSION:
+    RECOVERY_STORE_ADAPTER_VERSION
+} = require(
+  './recovery-store-adapters'
+);
 
 const {
   makeGenericAdapters
@@ -135,60 +63,181 @@ const {
 );
 
 const ADAPTER_REGISTRY_VERSION =
-  '2026-08-13-strict-v1';
+  '2026-08-13-registry-stable-v1';
 
 /*
  * ============================================================
- * STRICT-ONLY STORE
+ * OPTIONAL CUSTOM ADAPTERS
  * ============================================================
  *
- * Store ini TIDAK BOLEH fallback ke universal parser.
+ * Beberapa adapter berasal dari patch sebelumnya.
  *
- * Alasannya:
- *
- * kalau strict parser gagal, lebih baik tampil:
- *
- * PARSER_FAILED
- *
- * daripada menampilkan harga salah seperti:
- *
- * Top Up Zenless Zone Zero Murah → Rp199
- *
- * atau:
- *
- * 300 Monochrome → Rp16.224
+ * Dibuat optional supaya index.js tidak membuat server crash
+ * bila salah satu file belum tersedia pada branch tertentu.
  */
-const STRICT_ONLY_STORE_IDS =
-  new Set([
-    'casatopup',
-    'topupgamez',
-    'bxystore',
-    'kios-game-indonesia'
-  ]);
+function optionalAdapter(
+  path
+) {
+  try {
+    return require(
+      path
+    );
+  } catch (
+    error
+  ) {
+    if (
+      error?.code ===
+        'MODULE_NOT_FOUND' &&
+      String(
+        error?.message ||
+        ''
+      ).includes(
+        `'${path}'`
+      )
+    ) {
+      return null;
+    }
 
-const DEDICATED = {
-  codashop,
-  unipin,
-  lapakgaming,
-  duniagames,
+    throw error;
+  }
+}
 
-  gigames,
-
-  'oura-store':
-    ouraStore,
-
-  seagm,
+const optionalCustomAdapters = {
+  gigames:
+    optionalAdapter(
+      './gigames'
+    ),
 
   'kios-game-indonesia':
-    kiosGameIndonesia,
+    optionalAdapter(
+      './kios-game-indonesia'
+    ),
 
-  topupdeh,
+  casatopup:
+    optionalAdapter(
+      './casatopup'
+    ),
 
-  casatopup,
+  topupgamez:
+    optionalAdapter(
+      './topupgamez'
+    ),
 
-  topupgamez,
+  bxystore:
+    optionalAdapter(
+      './bxystore'
+    )
+};
 
-  bxystore
+const existingCustom =
+  Object.fromEntries(
+    Object.entries(
+      optionalCustomAdapters
+    )
+      .filter(
+        (
+          [
+            ,
+            adapter
+          ]
+        ) =>
+          Boolean(
+            adapter
+          )
+      )
+  );
+
+/*
+ * ============================================================
+ * DEDICATED REGISTRY
+ * ============================================================
+ *
+ * Prinsip versi ini:
+ *
+ * 1. Lapakgaming dan Dunia Games tidak diubah.
+ *
+ * 2. Codashop / UniPin:
+ *    legacy dahulu → strict recovery jika legacy tidak
+ *    configured / parser failed.
+ *
+ * 3. Adapter custom yang sebelumnya berhasil tetap dijaga.
+ *
+ * 4. Sebelas toko yang sekarang bermasalah benar-benar
+ *    diarahkan ke recovery-store-adapters.
+ *
+ * 5. Universal parser tetap menjadi fallback.
+ */
+const DEDICATED = {
+  lapakgaming,
+
+  duniagames,
+
+  /*
+   * Legacy + strict recovery.
+   */
+  codashop:
+    createLegacyThenRecoveryAdapter(
+      codashopLegacy,
+      recoveryAdapters
+        .codashop
+    ),
+
+  unipin:
+    createLegacyThenRecoveryAdapter(
+      unipinLegacy,
+      recoveryAdapters
+        .unipin
+    ),
+
+  /*
+   * Pertahankan custom adapter lama yang tersedia.
+   */
+  ...existingCustom,
+
+  /*
+   * Recovery adapters diletakkan PALING AKHIR.
+   *
+   * Dengan begitu store-store di bawah tidak tertimpa
+   * registry lama.
+   */
+  'gopay-games':
+    recoveryAdapters[
+      'gopay-games'
+    ],
+
+  'ggwp-topup':
+    recoveryAdapters[
+      'ggwp-topup'
+    ],
+
+  'oura-store':
+    recoveryAdapters[
+      'oura-store'
+    ],
+
+  topupgamestore:
+    recoveryAdapters
+      .topupgamestore,
+
+  topupdeh:
+    recoveryAdapters
+      .topupdeh,
+
+  seagm:
+    recoveryAdapters
+      .seagm,
+
+  sontopup:
+    recoveryAdapters
+      .sontopup,
+
+  yoggstore:
+    recoveryAdapters
+      .yoggstore,
+
+  gamestorecan:
+    recoveryAdapters
+      .gamestorecan
 };
 
 function normalizeStrategyList(
@@ -197,9 +246,11 @@ function normalizeStrategyList(
 ) {
   const requested =
     Array.isArray(
-      store.accessStrategies
+      store
+        .accessStrategies
     )
-      ? store.accessStrategies
+      ? store
+          .accessStrategies
       : [
           'public-api',
           'dedicated',
@@ -213,7 +264,8 @@ function normalizeStrategyList(
     .map(
       (value) =>
         String(
-          value || ''
+          value ||
+          ''
         )
           .trim()
           .toLowerCase()
@@ -285,22 +337,19 @@ function buildStoreAdapter(
 
   /*
    * ========================================================
-   * UNIVERSAL
+   * UNIVERSAL FALLBACK
    * ========================================================
    *
-   * STRICT_ONLY_STORE_IDS sengaja TIDAK mendapat
-   * universal fallback.
+   * Sengaja tetap aktif.
    *
-   * Tujuannya supaya false-positive tidak kembali
-   * masuk setelah dedicated strict parser menolaknya.
+   * Kita TIDAK menerapkan strict-only secara global lagi
+   * karena perubahan global sebelumnya membuat provider yang
+   * sebenarnya sudah stabil ikut regression.
    */
   if (
-    store.disableUniversal !==
-      true &&
-    !STRICT_ONLY_STORE_IDS
-      .has(
-        store.id
-      )
+    store
+      .disableUniversal !==
+    true
   ) {
     available.universal =
       createUniversalAdapter(
@@ -325,17 +374,13 @@ function buildStoreAdapter(
       );
 
   /*
-   * Compatibility fallback hanya untuk
-   * non-strict stores.
+   * Compatibility guard.
    */
   if (
     !strategies.length &&
-    store.disableUniversal !==
-      true &&
-    !STRICT_ONLY_STORE_IDS
-      .has(
-        store.id
-      )
+    store
+      .disableUniversal !==
+    true
   ) {
     strategies.push({
       id:
@@ -354,15 +399,23 @@ function buildStoreAdapter(
       strategies
     );
 
+  /*
+   * Marker supaya kita bisa memastikan deployment
+   * benar-benar sudah memakai registry ini.
+   */
   adapter
     .adapterRegistryVersion =
     ADAPTER_REGISTRY_VERSION;
+
+  adapter
+    .recoveryStoreAdapterVersion =
+    RECOVERY_STORE_ADAPTER_VERSION;
 
   return adapter;
 }
 
 function buildRegistryAdapters() {
-  const publicAdaptersEnabled =
+  const enabled =
     String(
       process.env
         .ENABLE_PUBLIC_PAGE_ADAPTERS ||
@@ -372,7 +425,7 @@ function buildRegistryAdapters() {
     'false';
 
   if (
-    !publicAdaptersEnabled
+    !enabled
   ) {
     return [];
   }
@@ -387,7 +440,10 @@ function selectAdapters(
   adapters,
   {
     offset = 0,
-    limit = adapters.length,
+
+    limit =
+      adapters.length,
+
     storeIds = []
   } = {}
 ) {
@@ -435,7 +491,7 @@ function selectAdapters(
     safeOffset,
 
     safeOffset +
-    safeLimit
+      safeLimit
   );
 }
 
@@ -453,7 +509,9 @@ function getStoreAdapters(
 
   const includeFeeds =
     !options.offset &&
-    !options.storeIds?.length;
+    !options
+      .storeIds
+      ?.length;
 
   return includeFeeds
     ? [
@@ -471,6 +529,8 @@ function getStoreAdapterCount() {
 
 module.exports = {
   ADAPTER_REGISTRY_VERSION,
+
+  RECOVERY_STORE_ADAPTER_VERSION,
 
   getStoreAdapters,
 
