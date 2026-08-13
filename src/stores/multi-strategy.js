@@ -3,69 +3,125 @@
 const {
   shouldAttemptParserRecovery,
   tryParserRecovery
-} = require(
-  './parser-recovery'
-);
+} = require('./parser-recovery');
 
 const MULTI_STRATEGY_VERSION =
-  '2026-08-12-multi-v3';
+  '2026-08-13-multi-v4';
+
+/*
+ * ============================================================
+ * TERMINAL PROVIDER STATES
+ * ============================================================
+ *
+ * Jika state-aware adapter sudah bisa membuktikan keadaan
+ * berikut, JANGAN lanjut ke universal parser.
+ */
+const TERMINAL_PROVIDER_STATE_CODES =
+  new Set([
+    'REGION_UNAVAILABLE',
+    'DYNAMIC_PRICE_REQUIRED',
+    'PRODUCT_UNAVAILABLE',
+    'MAINTENANCE'
+  ]);
 
 /*
  * ============================================================
  * ERROR PRIORITY
  * ============================================================
  *
- * Priority ini sengaja mengikuti flow yang sebelumnya
- * membuat SEAGM berhasil.
- *
- * Jangan menaikkan ACCESS_BLOCKED di atas PARSER_FAILED
- * pada patch ini karena perubahan tersebut sempat membuat
- * behaviour provider berubah.
+ * Provider state HARUS lebih kuat daripada PARSER_FAILED.
  */
 const ERROR_PRIORITY = {
-  PARSER_FAILED: 100,
+  REGION_UNAVAILABLE:
+    150,
 
-  PAGE_NOT_VERIFIED: 95,
+  MAINTENANCE:
+    148,
 
-  ACCESS_BLOCKED: 90,
+  PRODUCT_UNAVAILABLE:
+    146,
 
-  RATE_LIMITED: 88,
+  DYNAMIC_PRICE_REQUIRED:
+    144,
 
-  NETWORK_TLS_ERROR: 80,
+  PARSER_FAILED:
+    100,
 
-  NETWORK_CONNECTION_ERROR: 78,
+  PAGE_NOT_VERIFIED:
+    95,
 
-  NETWORK_DNS_ERROR: 76,
+  ACCESS_BLOCKED:
+    90,
 
-  NETWORK_CONNECT_TIMEOUT: 74,
+  RATE_LIMITED:
+    88,
 
-  NETWORK_FETCH_FAILED: 72,
+  NETWORK_TLS_ERROR:
+    80,
 
-  TIMEOUT: 70,
+  NETWORK_CONNECTION_ERROR:
+    78,
 
-  UPSTREAM_ERROR: 60,
+  NETWORK_DNS_ERROR:
+    76,
 
-  HTTP_ERROR: 50,
+  NETWORK_CONNECT_TIMEOUT:
+    74,
 
-  DISCOVERY_BLOCKED: 40,
+  NETWORK_FETCH_FAILED:
+    72,
 
-  CANDIDATE_BLOCKED: 35,
+  TIMEOUT:
+    70,
 
-  PAGE_NOT_FOUND: 20,
+  UPSTREAM_ERROR:
+    60,
 
-  NOT_CONFIGURED: 10
+  HTTP_ERROR:
+    50,
+
+  DISCOVERY_BLOCKED:
+    40,
+
+  CANDIDATE_BLOCKED:
+    35,
+
+  PAGE_NOT_FOUND:
+    20,
+
+  NOT_CONFIGURED:
+    10
 };
+
+function normalizeCode(
+  error
+) {
+  return String(
+    error?.code || ''
+  )
+    .trim()
+    .toUpperCase();
+}
+
+function isTerminalProviderState(
+  error
+) {
+  return TERMINAL_PROVIDER_STATE_CODES
+    .has(
+      normalizeCode(
+        error
+      )
+    );
+}
 
 function errorPriority(
   error
 ) {
   return (
     ERROR_PRIORITY[
-      String(
-        error?.code ||
-        ''
+      normalizeCode(
+        error
       )
-        .toUpperCase()
     ] ||
     0
   );
@@ -75,15 +131,11 @@ function pickStrongerError(
   current,
   candidate
 ) {
-  if (
-    !candidate
-  ) {
+  if (!candidate) {
     return current;
   }
 
-  if (
-    !current
-  ) {
+  if (!current) {
     return candidate;
   }
 
@@ -105,14 +157,24 @@ function shouldStopChain(
   store
 ) {
   const code =
-    String(
-      error?.code ||
-      ''
-    )
-      .toUpperCase();
+    normalizeCode(
+      error
+    );
 
   /*
-   * RATE LIMIT
+   * ========================================================
+   * PROVIDER STATE = TERMINAL
+   * ========================================================
+   */
+  if (
+    TERMINAL_PROVIDER_STATE_CODES
+      .has(code)
+  ) {
+    return true;
+  }
+
+  /*
+   * Rate limit.
    */
   if (
     code ===
@@ -122,8 +184,7 @@ function shouldStopChain(
   }
 
   /*
-   * Error selain ACCESS_BLOCKED
-   * masih boleh lanjut.
+   * Error selain ACCESS_BLOCKED masih boleh lanjut.
    */
   if (
     code !==
@@ -132,9 +193,6 @@ function shouldStopChain(
     return false;
   }
 
-  /*
-   * Public API boleh mempunyai policy sendiri.
-   */
   if (
     strategyId ===
     'public-api'
@@ -146,9 +204,6 @@ function shouldStopChain(
     );
   }
 
-  /*
-   * Dedicated adapter diblokir.
-   */
   if (
     strategyId ===
     'dedicated'
@@ -163,160 +218,9 @@ function shouldStopChain(
   return true;
 }
 
-/*
- * ============================================================
- * SOURCE NORMALIZATION
- * ============================================================
- *
- * Hasil:
- *
- * recovery-visible
- * recovery-serialized
- * recovery-catalog
- * dedicated-visible
- * dedicated-serialized
- *
- * semuanya berasal dari fetch toko sebenarnya.
- *
- * Frontend VoucherLens saat ini menganggap hanya
- * source === "live" sebagai Live.
- *
- * Karena itu sumber asli disimpan ke extractionSource,
- * sedangkan source dinormalisasi menjadi live.
- */
-function normalizeOfferSource(
-  offer,
-  strategyId
-) {
-  const originalSource =
-    String(
-      offer?.source ||
-      ''
-    )
-      .trim();
-
-  const normalizedSource =
-    originalSource
-      .toLowerCase();
-
-  const isDemoSource =
-    normalizedSource ===
-      'fallback' ||
-    normalizedSource ===
-      'demo';
-
-  return {
-    ...offer,
-
-    source:
-      isDemoSource
-        ? 'fallback'
-        : 'live',
-
-    extractionSource:
-      offer?.extractionSource ||
-      originalSource ||
-      strategyId,
-
-    accessStrategy:
-      offer?.accessStrategy ||
-      strategyId,
-
-    multiStrategyVersion:
-      MULTI_STRATEGY_VERSION
-  };
-}
-
-/*
- * ============================================================
- * OFFER VALIDATION
- * ============================================================
- *
- * Khusus SEAGM parser recovery:
- *
- * jangan tampilkan harga asing seperti:
- *
- * NZ$ 0.99
- * NZ$ 1.45
- *
- * sebagai:
- *
- * Rp1
- * Rp99
- *
- * Tetapi IMPORTANT:
- *
- * offer invalid hanya difilter dari hasil,
- * TIDAK menyebabkan strategy berubah menjadi
- * PARSER_FAILED.
- *
- * Inilah perbedaan penting dari patch sebelumnya.
- */
-function isUsableOffer(
-  offer,
-  strategyId,
-  store
-) {
-  if (
-    !offer ||
-    typeof offer !==
-      'object'
-  ) {
-    return false;
-  }
-
-  if (
-    store?.id ===
-      'seagm' &&
-    strategyId ===
-      'parser-recovery'
-  ) {
-    const priceText =
-      String(
-        offer?.priceText ||
-        ''
-      );
-
-    const price =
-      Number(
-        offer.finalPrice ??
-        offer.productPrice
-      );
-
-    /*
-     * Recovery SEAGM hanya ditampilkan jika ada
-     * bukti eksplisit currency Rupiah.
-     */
-    if (
-      !/(?:\bIDR\b|\bRp\s*\.?)/i
-        .test(
-          priceText
-        )
-    ) {
-      return false;
-    }
-
-    /*
-     * Hindari bogus Rp1 / Rp99.
-     */
-    if (
-      !Number.isFinite(
-        price
-      ) ||
-      price <
-        100
-    ) {
-      return false;
-    }
-  }
-
-  return true;
-}
-
 function mapOffersWithStrategy(
   offers,
-  strategyId,
-  store
+  strategyId
 ) {
   if (
     !Array.isArray(
@@ -326,22 +230,18 @@ function mapOffersWithStrategy(
     return [];
   }
 
-  return offers
-    .filter(
-      (offer) =>
-        isUsableOffer(
-          offer,
-          strategyId,
-          store
-        )
-    )
-    .map(
-      (offer) =>
-        normalizeOfferSource(
-          offer,
-          strategyId
-        )
-    );
+  return offers.map(
+    (offer) => ({
+      ...offer,
+
+      accessStrategy:
+        offer?.accessStrategy ||
+        strategyId,
+
+      multiStrategyVersion:
+        MULTI_STRATEGY_VERSION
+    })
+  );
 }
 
 function attemptLog(
@@ -394,25 +294,19 @@ function createMultiStrategyAdapter(
       game,
       options = {}
     ) {
-      const attempts =
-        [];
+      const attempts = [];
 
       let strongestError =
         null;
 
       for (
-        const strategy
-        of strategies
+        const strategy of
+        strategies
       ) {
         const startedAt =
           Date.now();
 
         try {
-          /*
-           * ==================================================
-           * NORMAL STRATEGY
-           * ==================================================
-           */
           const offers =
             await strategy
               .adapter
@@ -449,18 +343,9 @@ function createMultiStrategyAdapter(
             attempts
           };
 
-          /*
-           * Penting:
-           *
-           * hasil filter boleh menjadi [].
-           *
-           * Jangan throw PARSER_FAILED di sini,
-           * supaya SEAGM tidak regression lagi.
-           */
           return mapOffersWithStrategy(
             offers,
-            strategy.id,
-            store
+            strategy.id
           );
         } catch (
           error
@@ -482,18 +367,16 @@ function createMultiStrategyAdapter(
                   null,
 
                 parserReason:
-                  error
-                    ?.parserReason ||
+                  error?.parserReason ||
                   null,
 
                 message:
-                  error
-                    ?.message ||
+                  error?.message ||
                   null,
 
-                dedicatedDiagnostics:
+                providerStateDiagnostics:
                   error
-                    ?.dedicatedDiagnostics ||
+                    ?.providerStateDiagnostics ||
                   null
               }
             )
@@ -504,6 +387,29 @@ function createMultiStrategyAdapter(
               strongestError,
               error
             );
+
+          /*
+           * ==================================================
+           * TERMINAL PROVIDER STATE
+           * ==================================================
+           *
+           * INI YANG MENCEGAH:
+           *
+           * REGION_UNAVAILABLE
+           *        ↓
+           * universal parser
+           *        ↓
+           * PARSER_FAILED
+           *
+           * State yang sudah terbukti harus dipertahankan.
+           */
+          if (
+            isTerminalProviderState(
+              error
+            )
+          ) {
+            break;
+          }
 
           /*
            * ==================================================
@@ -559,17 +465,9 @@ function createMultiStrategyAdapter(
                 attempts
               };
 
-              /*
-               * Sama seperti normal strategy:
-               *
-               * jika seluruh offer SEAGM ternyata bukan IDR,
-               * hasil boleh [] tanpa mengubah provider menjadi
-               * PARSER_FAILED.
-               */
               return mapOffersWithStrategy(
                 recoveredOffers,
-                'parser-recovery',
-                store
+                'parser-recovery'
               );
             } catch (
               recoveryError
@@ -605,6 +503,11 @@ function createMultiStrategyAdapter(
                     recoveryDiagnostics:
                       recoveryError
                         ?.parserRecoveryDiagnostics ||
+                      null,
+
+                    providerStateDiagnostics:
+                      recoveryError
+                        ?.providerStateDiagnostics ||
                       null
                   }
                 )
@@ -615,14 +518,17 @@ function createMultiStrategyAdapter(
                   strongestError,
                   recoveryError
                 );
+
+              if (
+                isTerminalProviderState(
+                  recoveryError
+                )
+              ) {
+                break;
+              }
             }
           }
 
-          /*
-           * ==================================================
-           * STOP CHAIN
-           * ==================================================
-           */
           if (
             shouldStopChain(
               strategy.id,
@@ -635,11 +541,6 @@ function createMultiStrategyAdapter(
         }
       }
 
-      /*
-       * ======================================================
-       * ALL STRATEGIES FAILED
-       * ======================================================
-       */
       lastDiagnostics = {
         multiStrategyVersion:
           MULTI_STRATEGY_VERSION,
@@ -675,9 +576,15 @@ function createMultiStrategyAdapter(
 module.exports = {
   MULTI_STRATEGY_VERSION,
 
+  TERMINAL_PROVIDER_STATE_CODES,
+
+  ERROR_PRIORITY,
+
   createMultiStrategyAdapter,
 
   pickStrongerError,
 
-  shouldStopChain
+  shouldStopChain,
+
+  isTerminalProviderState
 };
