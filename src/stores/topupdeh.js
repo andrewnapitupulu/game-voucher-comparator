@@ -52,20 +52,26 @@ function errorCode(
 function toLive(
   offers
 ) {
-  return offers.map(
+  return (
+    Array.isArray(
+      offers
+    )
+      ? offers
+      : []
+  ).map(
     (offer) => ({
       ...offer,
 
       extractionSource:
-        offer.extractionSource ||
-        offer.source ||
+        offer?.extractionSource ||
+        offer?.source ||
         'dedicated',
 
       source:
         'live',
 
       accessStrategy:
-        offer.accessStrategy ||
+        offer?.accessStrategy ||
         'dedicated'
     })
   );
@@ -81,7 +87,9 @@ function pageUrlsFor(
 
   return [
     `https://topupdeh.id/${slug}`,
+
     `https://topupdeh.id/games/${slug}`,
+
     `https://topupdeh.id/game/${slug}`
   ];
 }
@@ -110,7 +118,7 @@ module.exports = {
 
     /*
      * ========================================================
-     * 1. DEDICATED PARSER
+     * 1. DEDICATED
      * ========================================================
      */
     try {
@@ -158,10 +166,6 @@ module.exports = {
       dedicatedError =
         error;
 
-      /*
-       * Jangan melakukan probe tambahan kalau origin
-       * memang blocked/rate-limited/network failure.
-       */
       if (
         INFRASTRUCTURE_ERRORS
           .has(
@@ -176,7 +180,7 @@ module.exports = {
 
     /*
      * ========================================================
-     * 2. DYNAMIC ENDPOINT RECOVERY
+     * 2. DYNAMIC ENDPOINT
      * ========================================================
      */
     try {
@@ -197,7 +201,9 @@ module.exports = {
         ) &&
         offers.length
       ) {
-        return offers;
+        return toLive(
+          offers
+        );
       }
     } catch (
       error
@@ -219,14 +225,13 @@ module.exports = {
 
     /*
      * ========================================================
-     * 3. PRODUCT STATE PROBE
+     * 3. STATE PROBE
      * ========================================================
      *
-     * product-state-probe.js memisahkan primary product
-     * section dari section "Game Lainnya".
+     * URL game target sudah valid tetapi extractor
+     * tidak menemukan pasangan nominal-harga.
      *
-     * Karena itu harga milik game rekomendasi tidak lagi
-     * dianggap harga game target.
+     * Harga pada "Game Lainnya" tidak dihitung.
      */
     try {
       await probeDynamicProductState({
@@ -240,15 +245,17 @@ module.exports = {
           pageUrls,
 
         allowCatalogEvidence:
-          false
+          false,
+
+        trustVerifiedGameUrlWithoutPair:
+          true
       });
     } catch (
       stateError
     ) {
       stateError.previousDedicatedError = {
         code:
-          dedicatedError
-            ?.code ||
+          dedicatedError?.code ||
           null,
 
         parserReason:
@@ -259,8 +266,7 @@ module.exports = {
 
       stateError.previousDynamicError = {
         code:
-          dynamicError
-            ?.code ||
+          dynamicError?.code ||
           null,
 
         parserReason:
@@ -272,10 +278,6 @@ module.exports = {
       throw stateError;
     }
 
-    /*
-     * Kalau probe tidak berhasil membuktikan dynamic
-     * product state, pertahankan error asli.
-     */
     if (
       dynamicError
     ) {
