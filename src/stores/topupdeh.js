@@ -6,7 +6,43 @@ const {
   './dedicated-store-parser'
 );
 
-function candidatesFor(
+const {
+  fetchDynamicOffers
+} = require(
+  './dynamic-page-recovery'
+);
+
+const STORE = {
+  id:
+    'topupdeh',
+
+  name:
+    'TopUpDeh'
+};
+
+function toLive(
+  offers
+) {
+  return offers.map(
+    (offer) => ({
+      ...offer,
+
+      extractionSource:
+        offer.extractionSource ||
+        offer.source ||
+        'dedicated',
+
+      source:
+        'live',
+
+      accessStrategy:
+        offer.accessStrategy ||
+        'dedicated'
+    })
+  );
+}
+
+function pageUrlsFor(
   game
 ) {
   const slug =
@@ -15,74 +51,98 @@ function candidatesFor(
     );
 
   return [
-    {
-      url:
-        `https://topupdeh.id/${slug}`,
+    `https://topupdeh.id/${slug}`,
 
-      mode:
-        'page'
-    },
+    `https://topupdeh.id/games/${slug}`,
 
-    {
-      url:
-        `https://topupdeh.id/games/${slug}`,
-
-      mode:
-        'page'
-    },
-
-    {
-      url:
-        `https://topupdeh.id/game/${slug}`,
-
-      mode:
-        'page'
-    }
+    `https://topupdeh.id/game/${slug}`
   ];
 }
 
 module.exports = {
   id:
-    'topupdeh',
+    STORE.id,
 
   name:
-    'TopUpDeh',
+    STORE.name,
 
   async fetchOffers(
     game,
     options = {}
   ) {
-    return fetchDedicatedOffers({
-      storeId:
-        'topupdeh',
+    const pageUrls =
+      pageUrlsFor(
+        game
+      );
 
-      storeName:
-        'TopUpDeh',
+    try {
+      const offers =
+        await fetchDedicatedOffers({
+          storeId:
+            STORE.id,
 
-      game,
-      options,
+          storeName:
+            STORE.name,
 
-      candidates:
-        candidatesFor(
-          game
-        ),
+          game,
+          options,
 
-      /*
-       * TopUpDeh tidak selalu mengirim daftar
-       * nominal pada visible server HTML.
-       */
-      enableDynamicDiscovery:
-        true,
+          candidates:
+            pageUrls.map(
+              (url) => ({
+                url,
 
-      /*
-       * Untuk ML jangan menerima satu pasangan
-       * dari konten SEO sebagai product list.
-       */
-      minOffers:
-        game.id ===
-        'mobile-legends'
-          ? 3
-          : 1
-    });
+                mode:
+                  'page'
+              })
+            ),
+
+          enableDynamicDiscovery:
+            true,
+
+          minOffers:
+            1
+        });
+
+      if (
+        offers.length
+      ) {
+        return toLive(
+          offers
+        );
+      }
+    } catch (
+      firstError
+    ) {
+      try {
+        return await fetchDynamicOffers({
+          store:
+            STORE,
+
+          game,
+          options,
+
+          pageUrls
+        });
+      } catch (
+        dynamicError
+      ) {
+        dynamicError
+          .previousDedicatedError = {
+            code:
+              firstError?.code ||
+              null,
+
+            parserReason:
+              firstError
+                ?.parserReason ||
+              null
+          };
+
+        throw dynamicError;
+      }
+    }
+
+    return [];
   }
 };
