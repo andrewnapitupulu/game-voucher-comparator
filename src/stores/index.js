@@ -1,89 +1,40 @@
 'use strict';
 
-const codashop =
-  require(
-    './codashop'
-  );
+const codashop = require('./codashop');
+const unipin = require('./unipin');
+const lapakgaming = require('./lapakgaming');
+const duniagames = require('./duniagames');
 
-const unipin =
-  require(
-    './unipin'
-  );
+const gigames = require('./gigames');
+const ouraStore = require('./oura-store');
+const kiosGameIndonesia = require('./kios-game-indonesia');
+const topupdeh = require('./topupdeh');
 
-const lapakgaming =
-  require(
-    './lapakgaming'
-  );
-
-const duniagames =
-  require(
-    './duniagames'
-  );
-
-/*
- * Dedicated adapters.
- *
- * Ketiga adapter ini sudah mempunyai file masing-masing,
- * tetapi harus diregistrasikan di sini supaya benar-benar
- * masuk ke strategy chain.
- */
-const gigames =
-  require(
-    './gigames'
-  );
-
-const ouraStore =
-  require(
-    './oura-store'
-  );
-
-const kiosGameIndonesia =
-  require(
-    './kios-game-indonesia'
-  );
-
-const {
-  makeGenericAdapters
-} = require(
-  './generic-json'
-);
-
-const {
-  createUniversalAdapter
-} = require(
-  './universal-page'
-);
+const { makeGenericAdapters } = require('./generic-json');
+const { createUniversalAdapter } = require('./universal-page');
 
 const {
   createPublicApiAdapter,
   isPublicApiConfigured
-} = require(
-  './public-api'
-);
+} = require('./public-api');
 
 const {
   createMultiStrategyAdapter
-} = require(
-  './multi-strategy'
-);
+} = require('./multi-strategy');
 
 const {
   listStores
-} = require(
-  '../config/stores'
-);
+} = require('../config/stores');
 
-/*
- * Marker untuk memastikan deployment
- * benar-benar menggunakan registry terbaru.
- */
 const ADAPTER_REGISTRY_VERSION =
-  '2026-08-12-dedicated-v2';
+  '2026-08-12-dedicated-v3';
 
 /*
  * ============================================================
  * DEDICATED ADAPTER REGISTRY
  * ============================================================
+ *
+ * Jangan menghapus adapter yang sebelumnya sudah berhasil.
  */
 const DEDICATED = {
   codashop,
@@ -91,16 +42,15 @@ const DEDICATED = {
   lapakgaming,
   duniagames,
 
-  /*
-   * Dedicated adapters baru.
-   */
   gigames,
 
   'oura-store':
     ouraStore,
 
   'kios-game-indonesia':
-    kiosGameIndonesia
+    kiosGameIndonesia,
+
+  topupdeh
 };
 
 function normalizeStrategyList(
@@ -198,8 +148,6 @@ function buildStoreAdapter(
    * ========================================================
    * UNIVERSAL
    * ========================================================
-   *
-   * Tetap menjadi fallback jika dedicated gagal.
    */
   if (
     store.disableUniversal !==
@@ -231,27 +179,21 @@ function buildStoreAdapter(
 
   /*
    * Compatibility guard.
-   *
-   * Kalau accessStrategies salah konfigurasi,
-   * universal tetap dipakai selama tidak disabled.
    */
   if (
-    !strategies.length
-  ) {
-    if (
-      store.disableUniversal !==
+    !strategies.length &&
+    store.disableUniversal !==
       true
-    ) {
-      strategies.push({
-        id:
-          'universal',
+  ) {
+    strategies.push({
+      id:
+        'universal',
 
-        adapter:
-          createUniversalAdapter(
-            store
-          )
-      });
-    }
+      adapter:
+        createUniversalAdapter(
+          store
+        )
+    });
   }
 
   const adapter =
@@ -261,7 +203,7 @@ function buildStoreAdapter(
     );
 
   /*
-   * Version marker untuk debugging.
+   * Marker deployment.
    */
   adapter.adapterRegistryVersion =
     ADAPTER_REGISTRY_VERSION;
@@ -318,7 +260,6 @@ function selectAdapters(
   const safeOffset =
     Math.max(
       0,
-
       Number(
         offset
       ) ||
@@ -378,8 +319,12 @@ function getStoreAdapterCount() {
 
 module.exports = {
   ADAPTER_REGISTRY_VERSION,
+
   getStoreAdapters,
+
   getStoreAdapterCount,
+
   buildRegistryAdapters,
+
   buildStoreAdapter
 };
