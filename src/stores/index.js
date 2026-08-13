@@ -1,88 +1,48 @@
 'use strict';
 
-const codashopLegacy =
-  require(
-    './codashop'
-  );
-
-const unipinLegacy =
-  require(
-    './unipin'
-  );
-
-const lapakgaming =
-  require(
-    './lapakgaming'
-  );
-
-const duniagames =
-  require(
-    './duniagames'
-  );
+const codashopLegacy = require('./codashop');
+const unipinLegacy = require('./unipin');
+const lapakgaming = require('./lapakgaming');
+const duniagames = require('./duniagames');
 
 const {
   stateAwareRecoveryAdapters,
-
   createLegacyThenStateAwareRecoveryAdapter,
-
   STATE_AWARE_RECOVERY_VERSION
-} = require(
-  './recovery-store-state-aware'
-);
+} = require('./recovery-store-state-aware');
 
 const {
   makeGenericAdapters
-} = require(
-  './generic-json'
-);
+} = require('./generic-json');
 
 const {
   createUniversalAdapter
-} = require(
-  './universal-page'
-);
+} = require('./universal-page');
 
 const {
   createPublicApiAdapter,
   isPublicApiConfigured
-} = require(
-  './public-api'
-);
+} = require('./public-api');
 
 const {
   createMultiStrategyAdapter
-} = require(
-  './multi-strategy'
-);
+} = require('./multi-strategy');
 
 const {
   listStores
-} = require(
-  '../config/stores'
-);
+} = require('../config/stores');
 
 const ADAPTER_REGISTRY_VERSION =
-  '2026-08-13-registry-state-aware-v1';
+  '2026-08-13-final-four-v1';
 
-function optionalAdapter(
-  path
-) {
+function optionalAdapter(path) {
   try {
-    return require(
-      path
-    );
-  } catch (
-    error
-  ) {
+    return require(path);
+  } catch (error) {
     if (
-      error?.code ===
-        'MODULE_NOT_FOUND' &&
-      String(
-        error?.message ||
-        ''
-      ).includes(
-        `'${path}'`
-      )
+      error?.code === 'MODULE_NOT_FOUND' &&
+      String(error?.message || '')
+        .includes(`'${path}'`)
     ) {
       return null;
     }
@@ -92,14 +52,15 @@ function optionalAdapter(
 }
 
 /*
- * Adapter custom dari patch sebelumnya tetap
- * dipertahankan jika file-nya tersedia.
+ * ============================================================
+ * CUSTOM ADAPTERS YANG SUDAH BERHASIL
+ * ============================================================
+ *
+ * Jangan mengubah toko yang saat ini sudah berhasil.
  */
 const customAdapters = {
   gigames:
-    optionalAdapter(
-      './gigames'
-    ),
+    optionalAdapter('./gigames'),
 
   'kios-game-indonesia':
     optionalAdapter(
@@ -107,37 +68,28 @@ const customAdapters = {
     ),
 
   casatopup:
-    optionalAdapter(
-      './casatopup'
-    ),
+    optionalAdapter('./casatopup'),
 
   topupgamez:
-    optionalAdapter(
-      './topupgamez'
-    ),
+    optionalAdapter('./topupgamez'),
 
   bxystore:
-    optionalAdapter(
-      './bxystore'
-    )
+    optionalAdapter('./bxystore')
 };
 
 const existingCustom =
   Object.fromEntries(
     Object.entries(
       customAdapters
+    ).filter(
+      (
+        [
+          ,
+          adapter
+        ]
+      ) =>
+        Boolean(adapter)
     )
-      .filter(
-        (
-          [
-            ,
-            adapter
-          ]
-        ) =>
-          Boolean(
-            adapter
-          )
-      )
   );
 
 /*
@@ -146,15 +98,18 @@ const existingCustom =
  * ============================================================
  */
 const DEDICATED = {
+  /*
+   * Existing stable adapters.
+   */
   lapakgaming,
-
   duniagames,
 
   /*
-   * Codashop / UniPin:
+   * Codashop dan UniPin:
    *
-   * dedicated lama dahulu, kemudian state-aware
-   * recovery jika legacy tidak berhasil.
+   * adapter lama tetap dicoba terlebih dahulu.
+   * Jika tidak cocok dengan game/halaman,
+   * state-aware recovery mengambil alih.
    */
   codashop:
     createLegacyThenStateAwareRecoveryAdapter(
@@ -169,8 +124,7 @@ const DEDICATED = {
     ),
 
   /*
-   * Pertahankan custom adapters yang sekarang
-   * sudah bekerja.
+   * Existing custom parsers.
    */
   ...existingCustom,
 
@@ -244,31 +198,22 @@ function normalizeStrategyList(
     .map(
       (value) =>
         String(
-          value ||
-          ''
+          value || ''
         )
           .trim()
           .toLowerCase()
     )
-    .filter(
-      Boolean
-    )
+    .filter(Boolean)
     .filter(
       (value) => {
         if (
-          seen.has(
-            value
-          ) ||
-          !available[
-            value
-          ]
+          seen.has(value) ||
+          !available[value]
         ) {
           return false;
         }
 
-        seen.add(
-          value
-        );
+        seen.add(value);
 
         return true;
       }
@@ -278,22 +223,25 @@ function normalizeStrategyList(
 function buildStoreAdapter(
   store
 ) {
-  const available =
-    {};
+  const available = {};
 
+  /*
+   * PUBLIC API
+   */
   if (
     isPublicApiConfigured(
       store
     )
   ) {
-    available[
-      'public-api'
-    ] =
+    available['public-api'] =
       createPublicApiAdapter(
         store
       );
   }
 
+  /*
+   * DEDICATED / STATE-AWARE
+   */
   if (
     DEDICATED[
       store.id
@@ -306,8 +254,17 @@ function buildStoreAdapter(
   }
 
   /*
-   * Universal tetap fallback supaya toko yang
-   * sudah stabil tidak ikut regression.
+   * UNIVERSAL
+   *
+   * Tetap tersedia untuk parser failure biasa.
+   *
+   * Tetapi terminal provider state akan dihentikan
+   * oleh multi-strategy sebelum masuk universal:
+   *
+   * REGION_UNAVAILABLE
+   * DYNAMIC_PRICE_REQUIRED
+   * PRODUCT_UNAVAILABLE
+   * MAINTENANCE
    */
   if (
     store.disableUniversal !==
@@ -323,17 +280,14 @@ function buildStoreAdapter(
     normalizeStrategyList(
       store,
       available
-    )
-      .map(
-        (id) => ({
-          id,
+    ).map(
+      (id) => ({
+        id,
 
-          adapter:
-            available[
-              id
-            ]
-        })
-      );
+        adapter:
+          available[id]
+      })
+    );
 
   if (
     !strategies.length &&
@@ -357,12 +311,10 @@ function buildStoreAdapter(
       strategies
     );
 
-  adapter
-    .adapterRegistryVersion =
+  adapter.adapterRegistryVersion =
     ADAPTER_REGISTRY_VERSION;
 
-  adapter
-    .stateAwareRecoveryVersion =
+  adapter.stateAwareRecoveryVersion =
     STATE_AWARE_RECOVERY_VERSION;
 
   return adapter;
@@ -378,9 +330,7 @@ function buildRegistryAdapters() {
       .toLowerCase() !==
     'false';
 
-  if (
-    !enabled
-  ) {
+  if (!enabled) {
     return [];
   }
 
@@ -417,30 +367,20 @@ function selectAdapters(
   const safeOffset =
     Math.max(
       0,
-
-      Number(
-        offset
-      ) ||
-      0
+      Number(offset) || 0
     );
 
   const safeLimit =
     Math.max(
       1,
-
       Math.min(
         20,
-
-        Number(
-          limit
-        ) ||
-        8
+        Number(limit) || 8
       )
     );
 
   return adapters.slice(
     safeOffset,
-
     safeOffset +
       safeLimit
   );
@@ -465,7 +405,6 @@ function getStoreAdapters(
   return includeFeeds
     ? [
         ...selectedRegistry,
-
         ...makeGenericAdapters()
       ]
     : selectedRegistry;
@@ -478,14 +417,9 @@ function getStoreAdapterCount() {
 
 module.exports = {
   ADAPTER_REGISTRY_VERSION,
-
   STATE_AWARE_RECOVERY_VERSION,
-
   getStoreAdapters,
-
   getStoreAdapterCount,
-
   buildRegistryAdapters,
-
   buildStoreAdapter
 };
