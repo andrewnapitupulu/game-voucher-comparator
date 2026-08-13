@@ -54,37 +54,48 @@ function urlsFor(
   return {
     candidates: [
       `https://bxystore.com/en-id/beli/${slug}`,
+
       `https://bxystore.com/id/beli/${slug}`,
+
       `https://bxystore.com/beli/${slug}`,
+
       `https://bxystore.com/my-id/beli/${slug}`,
+
       `https://bxystore.com/fil-id/beli/${slug}`,
+
       `https://bxystore.com/th-id/beli/${slug}`,
+
       `https://bxystore.com/ja-id/beli/${slug}`,
+
       `https://bxystore.com/vi-id/beli/${slug}`
     ],
 
     /*
-     * Catalog pages hanya digunakan sebagai evidence
-     * bahwa game tersedia.
+     * Hanya sebagai availability evidence.
      *
-     * Catalog tidak digunakan sebagai sumber
-     * product-price pairing.
+     * Harga di halaman catalog tidak boleh dipakai
+     * sebagai harga game target.
      */
     discoveryPages: [
-      'https://bxystore.com/en-id',
       'https://bxystore.com/en-id/products',
 
-      'https://bxystore.com/my-id',
       'https://bxystore.com/my-id/products',
 
-      'https://bxystore.com/fil-id',
       'https://bxystore.com/fil-id/products',
 
-      'https://bxystore.com/th-id',
       'https://bxystore.com/th-id/products',
 
       'https://bxystore.com/ja-id/products',
+
       'https://bxystore.com/vi-id/products',
+
+      'https://bxystore.com/en-id',
+
+      'https://bxystore.com/my-id',
+
+      'https://bxystore.com/fil-id',
+
+      'https://bxystore.com/th-id',
 
       'https://bxystore.com/'
     ]
@@ -112,7 +123,7 @@ module.exports = {
 
     /*
      * ========================================================
-     * 1. STRICT PRODUCT-PRICE PAIRING
+     * 1. STRICT EXTRACTION
      * ========================================================
      */
     try {
@@ -148,9 +159,6 @@ module.exports = {
       strictError =
         error;
 
-      /*
-       * Jangan request ulang untuk infrastructure failure.
-       */
       if (
         INFRASTRUCTURE_ERRORS
           .has(
@@ -165,13 +173,19 @@ module.exports = {
 
     /*
      * ========================================================
-     * 2. PRODUCT STATE PROBE
+     * 2. STATE PROBE
      * ========================================================
      *
-     * BXYStore boleh membuktikan keberadaan game melalui
-     * catalog page.
+     * Jika:
      *
-     * Tetapi harga catalog tidak dipakai untuk membuat offer.
+     * - product URL valid, atau
+     * - catalog membuktikan game tersedia
+     *
+     * tetapi strict product-price pair tidak ditemukan,
+     * classify sebagai DYNAMIC_PRICE_REQUIRED.
+     *
+     * Harga produk lain di catalog tidak menjadi
+     * price evidence.
      */
     try {
       await probeDynamicProductState({
@@ -183,10 +197,14 @@ module.exports = {
 
         urls: [
           ...urls.candidates,
+
           ...urls.discoveryPages
         ],
 
         allowCatalogEvidence:
+          true,
+
+        trustVerifiedGameUrlWithoutPair:
           true
       });
     } catch (
@@ -194,8 +212,7 @@ module.exports = {
     ) {
       stateError.previousStrictError = {
         code:
-          strictError
-            ?.code ||
+          strictError?.code ||
           null,
 
         parserReason:
@@ -208,8 +225,8 @@ module.exports = {
     }
 
     /*
-     * Kalau game/product state tidak dapat dibuktikan,
-     * pertahankan genuine parser error.
+     * Tidak ada evidence bahwa game/page target valid.
+     * Kalau begitu tetap genuine parser failure.
      */
     if (
       strictError
